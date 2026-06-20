@@ -64,6 +64,7 @@ function Article() {
   const bookmarked = user.bookmarks.includes(item.id);
 
   async function share() {
+    if (!item) return;
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
       if (navigator.share) {

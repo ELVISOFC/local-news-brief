@@ -13,7 +13,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-border safe-bottom">
       <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-2">
         {items.map(({ to, label, Icon }) => {
-          const active = pathname === to || (to !== "/" && pathname.startsWith(to));
+          const active = pathname === to || pathname.startsWith(to + "/");
           return (
             <Link
               key={to}

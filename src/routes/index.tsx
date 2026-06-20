@@ -1,14 +1,16 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { getState } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    // Client-only routing decision; SSR will render the fallback once and the
-    // client takes over with the hydrated state on mount.
-    if (typeof window !== "undefined") {
-      const s = getState();
-      throw redirect({ to: s.onboarded ? "/area" : "/welcome" });
-    }
-  },
-  component: () => null,
+  component: IndexRedirect,
 });
+
+function IndexRedirect() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const s = getState();
+    navigate({ to: s.onboarded ? "/area" : "/welcome", replace: true });
+  }, [navigate]);
+  return null;
+}

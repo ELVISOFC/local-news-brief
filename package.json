@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "preflight": "node scripts/check-tanstack-versions.mjs",
+    "prebuild": "node scripts/check-tanstack-versions.mjs",
+    "prebuild:dev": "node scripts/check-tanstack-versions.mjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",

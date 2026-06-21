@@ -79,7 +79,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     if (endFired || stopped) return;
     endFired = true;
     opts.onEnd?.();
-    ctx.close().catch(() => {});
+    if (ownsContext) ctx.close().catch(() => {});
   };
 
   const scheduleEndCheck = () => {

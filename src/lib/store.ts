@@ -115,8 +115,8 @@ export const actions = {
   setVoiceRate(r: number) {
     setState((s) => ({ ...s, voiceRate: r }));
   },
-  setVoiceName(n: string | null) {
-    setState((s) => ({ ...s, voiceName: n }));
+  setVoiceId(id: string) {
+    setState((s) => ({ ...s, voiceId: id }));
   },
   reset() {
     setState(() => defaultState);

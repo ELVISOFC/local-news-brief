@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MapPin, Plus, Trash2, Volume2, RefreshCw } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
-import { getVoices, isSpeechSupported } from "@/lib/speech";
+import { VOICE_OPTIONS } from "@/lib/speech";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),
@@ -17,19 +17,11 @@ export const Route = createFileRoute("/settings")({
 function Settings() {
   const user = useUser();
   const navigate = useNavigate();
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("Home");
   const [city, setCity] = useState("");
   const [stateCode, setStateCode] = useState("TX");
   const [zip, setZip] = useState("");
-
-  useEffect(() => {
-    if (!isSpeechSupported()) return;
-    const load = () => setVoices(getVoices().filter((v) => v.lang.startsWith("en")));
-    load();
-    window.speechSynthesis.onvoiceschanged = load;
-  }, []);
 
   function add() {
     if (!city.trim()) return;

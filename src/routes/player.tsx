@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Pause, Play, Rewind, FastForward, Gauge, FileText } from "lucide-react";
 import { actions, useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
-import { speak, type SpeechHandle } from "@/lib/speech";
+import { speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
 import { StoryArt } from "@/components/StoryArt";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -27,6 +27,7 @@ function Player() {
   const [showText, setShowText] = useState(false);
   const [ttsError, setTtsError] = useState<string | null>(null);
   const handleRef = useRef<SpeechHandle | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   // Approximate per-story duration based on word count + rate (visual progress only)
   const durations = useMemo(
@@ -55,6 +56,7 @@ function Player() {
     const handle = speak(story.body, {
       voice: user.voiceId,
       speed: user.voiceRate,
+      audioContext: audioCtxRef.current ?? undefined,
       onEnd: () => {
         if (index < stories.length - 1) {
           setIndex((i) => i + 1);
@@ -72,10 +74,19 @@ function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, isPlaying, user.voiceRate, user.voiceId]);
 
-  useEffect(() => () => handleRef.current?.stop(), []);
+  useEffect(() => () => {
+    handleRef.current?.stop();
+    audioCtxRef.current?.close().catch(() => {});
+  }, []);
 
   function togglePlay() {
     if (!isPlaying) {
+      // Create + resume the AudioContext inside the user gesture so browsers
+      // allow playback (autoplay policy). Reuse across stories.
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = createAudioContext();
+      }
+      audioCtxRef.current?.resume().catch(() => {});
       setIsPlaying(true);
     } else {
       handleRef.current?.stop();

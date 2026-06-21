@@ -40,10 +40,19 @@ type SpeakOpts = {
   voice?: string;
   speed?: number; // 0.25..4
   instructions?: string;
+  audioContext?: AudioContext; // pass one created in a user-gesture handler for reliable playback
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (err: Error) => void;
 };
+
+export function createAudioContext(): AudioContext | null {
+  if (!isSpeechSupported()) return null;
+  const AC =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  return new AC({ sampleRate: 24000 });
+}
 
 export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   const noop: SpeechHandle = { stop() {}, pause() {}, resume() {} };
@@ -52,10 +61,8 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     return noop;
   }
 
-  const AC =
-    window.AudioContext ||
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const ctx = new AC({ sampleRate: 24000 });
+  const ctx = opts.audioContext ?? createAudioContext()!;
+  const ownsContext = !opts.audioContext;
   const abort = new AbortController();
 
   let playhead = 0;

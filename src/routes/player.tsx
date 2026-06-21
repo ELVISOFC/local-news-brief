@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Pause, Play, Rewind, FastForward, Gauge, FileText } from "lucide-react";
 import { actions, useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
-import { cancelSpeech, isSpeechSupported, pauseSpeech, resumeSpeech, speak } from "@/lib/speech";
+import { speak, type SpeechHandle } from "@/lib/speech";
 import { StoryArt } from "@/components/StoryArt";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -25,6 +25,8 @@ function Player() {
   const [index, setIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showText, setShowText] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  const handleRef = useRef<SpeechHandle | null>(null);
 
   // Approximate per-story duration based on word count + rate (visual progress only)
   const durations = useMemo(
@@ -40,21 +42,19 @@ function Player() {
   useEffect(() => {
     if (!isPlaying) return;
     const t = setInterval(() => {
-      setElapsed((e) => {
-        const next = Math.min(e + 0.25, totalDuration);
-        return next;
-      });
+      setElapsed((e) => Math.min(e + 0.25, totalDuration));
     }, 250);
     return () => clearInterval(t);
   }, [isPlaying, totalDuration]);
 
-  // Start speech for current story when index changes & playing
+  // Start streaming TTS for current story when index changes & playing
   useEffect(() => {
     if (!isPlaying) return;
     const story = stories[index];
+    setTtsError(null);
     const handle = speak(story.body, {
-      rate: user.voiceRate,
-      voiceName: user.voiceName,
+      voice: user.voiceId,
+      speed: user.voiceRate,
       onEnd: () => {
         if (index < stories.length - 1) {
           setIndex((i) => i + 1);
@@ -62,33 +62,40 @@ function Player() {
           setIsPlaying(false);
         }
       },
+      onError: (err) => setTtsError(err.message),
     });
-    return () => handle.stop();
+    handleRef.current = handle;
+    return () => {
+      handle.stop();
+      if (handleRef.current === handle) handleRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, isPlaying, user.voiceRate]);
+  }, [index, isPlaying, user.voiceRate, user.voiceId]);
 
-  useEffect(() => () => cancelSpeech(), []);
+  useEffect(() => () => handleRef.current?.stop(), []);
 
   function togglePlay() {
     if (!isPlaying) {
       setIsPlaying(true);
     } else {
-      pauseSpeech();
+      handleRef.current?.stop();
+      handleRef.current = null;
       setIsPlaying(false);
     }
   }
 
   function seekStory(delta: number) {
-    cancelSpeech();
+    handleRef.current?.stop();
+    handleRef.current = null;
     const next = Math.max(0, Math.min(stories.length - 1, index + delta));
     setIndex(next);
-    // recompute elapsed to start of that story
     const e = durations.slice(0, next).reduce((a, b) => a + b, 0);
     setElapsed(e);
   }
 
   function setStory(i: number) {
-    cancelSpeech();
+    handleRef.current?.stop();
+    handleRef.current = null;
     setIndex(i);
     const e = durations.slice(0, i).reduce((a, b) => a + b, 0);
     setElapsed(e);
@@ -195,9 +202,9 @@ function Player() {
           </div>
         </div>
 
-        {!isSpeechSupported() ? (
-          <div className="mt-3 rounded-lg bg-white/10 p-2 text-center text-xs opacity-80">
-            Audio narration not supported in this browser — use the read view above.
+        {ttsError ? (
+          <div className="mt-3 rounded-lg bg-red-500/20 p-2 text-center text-xs">
+            Audio failed: {ttsError}
           </div>
         ) : null}
 
@@ -212,6 +219,3 @@ function fmt(s: number) {
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
-
-// silence unused import warning
-void resumeSpeech;

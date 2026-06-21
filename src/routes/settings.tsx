@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MapPin, Plus, Trash2, Volume2, RefreshCw } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
-import { getVoices, isSpeechSupported } from "@/lib/speech";
+import { VOICE_OPTIONS } from "@/lib/speech";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),
@@ -17,19 +17,11 @@ export const Route = createFileRoute("/settings")({
 function Settings() {
   const user = useUser();
   const navigate = useNavigate();
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("Home");
   const [city, setCity] = useState("");
   const [stateCode, setStateCode] = useState("TX");
   const [zip, setZip] = useState("");
-
-  useEffect(() => {
-    if (!isSpeechSupported()) return;
-    const load = () => setVoices(getVoices().filter((v) => v.lang.startsWith("en")));
-    load();
-    window.speechSynthesis.onvoiceschanged = load;
-  }, []);
 
   function add() {
     if (!city.trim()) return;
@@ -130,20 +122,23 @@ function Settings() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Voice</label>
+              <label className="text-xs text-muted-foreground">Narrator voice</label>
               <Select
-                value={user.voiceName ?? "auto"}
-                onValueChange={(v) => actions.setVoiceName(v === "auto" ? null : v)}
+                value={user.voiceId}
+                onValueChange={(v) => actions.setVoiceId(v)}
               >
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Auto" /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto (recommended)</SelectItem>
-                  {voices.map((v) => <SelectItem key={v.name} value={v.name}>{v.name} ({v.lang})</SelectItem>)}
+                  {VOICE_OPTIONS.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.label} — {v.description}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {!isSpeechSupported() ? (
-                <div className="mt-2 text-xs text-muted-foreground">Speech synthesis not supported in this browser.</div>
-              ) : null}
+              <div className="mt-2 text-xs text-muted-foreground">
+                High-quality AI narration powered by Lovable AI. Streams instantly on play.
+              </div>
             </div>
           </div>
         </Section>

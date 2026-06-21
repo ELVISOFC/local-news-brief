@@ -16,6 +16,7 @@ import { Route as PlayerRouteImport } from './routes/player'
 import { Route as AreaRouteImport } from './routes/area'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArticleIdRouteImport } from './routes/article.$id'
+import { Route as ApiTtsRouteImport } from './routes/api/tts'
 
 const WorldRoute = WorldRouteImport.update({
   id: '/world',
@@ -52,6 +53,11 @@ const ArticleIdRoute = ArticleIdRouteImport.update({
   path: '/article/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTtsRoute = ApiTtsRouteImport.update({
+  id: '/api/tts',
+  path: '/api/tts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
   '/world': typeof WorldRoute
+  '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
   '/world': typeof WorldRoute
+  '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
   '/world': typeof WorldRoute
+  '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/welcome'
     | '/world'
+    | '/api/tts'
     | '/article/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/welcome'
     | '/world'
+    | '/api/tts'
     | '/article/$id'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/welcome'
     | '/world'
+    | '/api/tts'
     | '/article/$id'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   WelcomeRoute: typeof WelcomeRoute
   WorldRoute: typeof WorldRoute
+  ApiTtsRoute: typeof ApiTtsRoute
   ArticleIdRoute: typeof ArticleIdRoute
 }
 
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ArticleIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tts': {
+      id: '/api/tts'
+      path: '/api/tts'
+      fullPath: '/api/tts'
+      preLoaderRoute: typeof ApiTtsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -182,18 +202,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   WelcomeRoute: WelcomeRoute,
   WorldRoute: WorldRoute,
+  ApiTtsRoute: ApiTtsRoute,
   ArticleIdRoute: ArticleIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

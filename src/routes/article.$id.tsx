@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bookmark, Pause, Play, Share2 } from "lucide-react";
 import { WORLD_ARTICLES } from "@/lib/mockData";
 import { getBriefing } from "@/lib/mockData";
 import { actions, useUser } from "@/lib/store";
 import { StoryArt } from "@/components/StoryArt";
-import { cancelSpeech, speak, isSpeechSupported } from "@/lib/speech";
+import { speak, isSpeechSupported, type SpeechHandle } from "@/lib/speech";
 
 export const Route = createFileRoute("/article/$id")({
   head: () => ({ meta: [{ title: "Article — AreaNews" }] }),
@@ -22,6 +22,7 @@ function Article() {
   const navigate = useNavigate();
   const user = useUser();
   const [playing, setPlaying] = useState(false);
+  const handleRef = useRef<SpeechHandle | null>(null);
 
   // Look up across world articles and all sample local stories
   const item = useMemo(() => {
@@ -35,7 +36,7 @@ function Article() {
     return null;
   }, [id]);
 
-  useEffect(() => () => cancelSpeech(), []);
+  useEffect(() => () => handleRef.current?.stop(), []);
 
   if (!item) {
     return (
@@ -49,13 +50,15 @@ function Article() {
   function togglePlay() {
     if (!item) return;
     if (playing) {
-      cancelSpeech();
+      handleRef.current?.stop();
+      handleRef.current = null;
       setPlaying(false);
     } else {
-      speak(item.body, {
-        rate: user.voiceRate,
-        voiceName: user.voiceName,
+      handleRef.current = speak(item.body, {
+        voice: user.voiceId,
+        speed: user.voiceRate,
         onEnd: () => setPlaying(false),
+        onError: () => setPlaying(false),
       });
       setPlaying(true);
     }

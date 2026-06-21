@@ -17,7 +17,7 @@ export type UserState = {
   bookmarks: string[]; // story or article ids
   filters: Filters;
   voiceRate: number; // 1, 1.25, 1.5, 1.75, 2
-  voiceName: string | null;
+  voiceId: string; // Lovable AI voice id (alloy, sage, verse, ...)
 };
 
 const KEY = "areanews_state_v1";
@@ -35,7 +35,7 @@ const defaultState: UserState = {
     time: "today",
   },
   voiceRate: 1,
-  voiceName: null,
+  voiceId: "alloy",
 };
 
 let state: UserState = load();
@@ -115,8 +115,8 @@ export const actions = {
   setVoiceRate(r: number) {
     setState((s) => ({ ...s, voiceRate: r }));
   },
-  setVoiceName(n: string | null) {
-    setState((s) => ({ ...s, voiceName: n }));
+  setVoiceId(id: string) {
+    setState((s) => ({ ...s, voiceId: id }));
   },
   reset() {
     setState(() => defaultState);

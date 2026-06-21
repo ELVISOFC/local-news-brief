@@ -122,20 +122,23 @@ function Settings() {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Voice</label>
+              <label className="text-xs text-muted-foreground">Narrator voice</label>
               <Select
-                value={user.voiceName ?? "auto"}
-                onValueChange={(v) => actions.setVoiceName(v === "auto" ? null : v)}
+                value={user.voiceId}
+                onValueChange={(v) => actions.setVoiceId(v)}
               >
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Auto" /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto (recommended)</SelectItem>
-                  {voices.map((v) => <SelectItem key={v.name} value={v.name}>{v.name} ({v.lang})</SelectItem>)}
+                  {VOICE_OPTIONS.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.label} — {v.description}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {!isSpeechSupported() ? (
-                <div className="mt-2 text-xs text-muted-foreground">Speech synthesis not supported in this browser.</div>
-              ) : null}
+              <div className="mt-2 text-xs text-muted-foreground">
+                High-quality AI narration powered by Lovable AI. Streams instantly on play.
+              </div>
             </div>
           </div>
         </Section>

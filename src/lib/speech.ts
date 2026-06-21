@@ -190,7 +190,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
         try { s.stop(); } catch { /* noop */ }
       });
       scheduledSources = [];
-      ctx.close().catch(() => {});
+      if (ownsContext) ctx.close().catch(() => {});
     },
     pause() {
       if (stopped) return;

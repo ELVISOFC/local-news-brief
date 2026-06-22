@@ -55,10 +55,8 @@ export async function savePreviewSamples(key: string, samples: Float32Array): Pr
   const db = await openDB();
   if (!db) return;
   // Copy to a standalone ArrayBuffer so we don't persist a view into a larger buffer.
-  const buffer = samples.buffer.slice(
-    samples.byteOffset,
-    samples.byteOffset + samples.byteLength,
-  );
+  const buffer = new ArrayBuffer(samples.byteLength);
+  new Float32Array(buffer).set(samples);
   return new Promise((resolve) => {
     try {
       const tx = db.transaction(STORE, "readwrite");

@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
 import { VOICE_OPTIONS, createAudioContext } from "@/lib/speech";
+import { loadPreviewSamples, savePreviewSamples } from "@/lib/preview-cache";
 
 // Module-level cache of decoded PCM samples keyed by voice|speed|text.
-// Survives route navigation within the SPA session so repeat previews are instant.
+// Survives route navigation within the SPA session; IndexedDB backs it across reloads.
 const previewSampleCache = new Map<string, Float32Array>();
 
 async function fetchPreviewSamples(
@@ -22,6 +23,14 @@ async function fetchPreviewSamples(
   const key = `${voice}|${speed}|${text}`;
   const cached = previewSampleCache.get(key);
   if (cached) return cached;
+
+  const persisted = await loadPreviewSamples(key);
+  if (persisted) {
+    previewSampleCache.set(key, persisted);
+    return persisted;
+  }
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+
 
   const res = await fetch("/api/tts", {
     method: "POST",

@@ -200,9 +200,29 @@ function Settings() {
                   ))}
                 </SelectContent>
               </Select>
-              <div className="mt-2 text-xs text-muted-foreground">
-                High-quality AI narration powered by Lovable AI. Streams instantly on play.
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={playPreview}
+                className="mt-3 gap-1.5"
+                aria-label={previewState === "idle" ? "Play voice preview" : "Stop voice preview"}
+              >
+                {previewState === "loading" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
+                ) : previewState === "playing" ? (
+                  <><Square className="h-4 w-4" /> Stop preview</>
+                ) : (
+                  <><Play className="h-4 w-4" /> Preview voice</>
+                )}
+              </Button>
+              {previewError ? (
+                <div className="mt-2 text-xs text-destructive">{previewError}</div>
+              ) : (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  High-quality AI narration powered by Lovable AI. Streams instantly on play.
+                </div>
+              )}
             </div>
           </div>
         </Section>

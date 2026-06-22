@@ -22,6 +22,70 @@ function Settings() {
   const [city, setCity] = useState("");
   const [stateCode, setStateCode] = useState("TX");
   const [zip, setZip] = useState("");
+  const [previewState, setPreviewState] = useState<"idle" | "loading" | "playing">("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewHandleRef = useRef<SpeechHandle | null>(null);
+  const previewCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    return () => {
+      previewHandleRef.current?.stop();
+      previewHandleRef.current = null;
+      previewCtxRef.current?.close().catch(() => {});
+      previewCtxRef.current = null;
+    };
+  }, []);
+
+  function stopPreview() {
+    previewHandleRef.current?.stop();
+    previewHandleRef.current = null;
+    if (previewCtxRef.current) {
+      previewCtxRef.current.close().catch(() => {});
+      previewCtxRef.current = null;
+    }
+    setPreviewState("idle");
+  }
+
+  function playPreview() {
+    if (previewState !== "idle") {
+      stopPreview();
+      return;
+    }
+    setPreviewError(null);
+    const voice = VOICE_OPTIONS.find((v) => v.id === user.voiceId);
+    const sample = `Hi, I'm ${voice?.label ?? "your narrator"}. Here's a quick sample of how your daily briefing will sound.`;
+    const ctx = createAudioContext();
+    if (!ctx) {
+      setPreviewError("Audio playback is not supported in this browser.");
+      return;
+    }
+    previewCtxRef.current = ctx;
+    setPreviewState("loading");
+    previewHandleRef.current = speak(sample, {
+      voice: user.voiceId,
+      speed: user.voiceRate,
+      audioContext: ctx,
+      onStart: () => setPreviewState("playing"),
+      onEnd: () => {
+        previewHandleRef.current = null;
+        if (previewCtxRef.current === ctx) {
+          ctx.close().catch(() => {});
+          previewCtxRef.current = null;
+        }
+        setPreviewState("idle");
+      },
+      onError: (err) => {
+        setPreviewError(err.message || "Couldn't play preview.");
+        previewHandleRef.current = null;
+        if (previewCtxRef.current === ctx) {
+          ctx.close().catch(() => {});
+          previewCtxRef.current = null;
+        }
+        setPreviewState("idle");
+      },
+    });
+  }
+
 
   function add() {
     if (!city.trim()) return;

@@ -7,7 +7,86 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
-import { VOICE_OPTIONS, speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
+import { VOICE_OPTIONS, createAudioContext } from "@/lib/speech";
+
+// Module-level cache of decoded PCM samples keyed by voice|speed|text.
+// Survives route navigation within the SPA session so repeat previews are instant.
+const previewSampleCache = new Map<string, Float32Array>();
+
+async function fetchPreviewSamples(
+  text: string,
+  voice: string,
+  speed: number,
+  signal: AbortSignal,
+): Promise<Float32Array> {
+  const key = `${voice}|${speed}|${text}`;
+  const cached = previewSampleCache.get(key);
+  if (cached) return cached;
+
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voice, speed }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || `TTS request failed: ${res.status}`);
+  }
+
+  const chunks: Uint8Array[] = [];
+  let pending = new Uint8Array(0);
+  const collect = (incoming: Uint8Array) => {
+    const bytes = new Uint8Array(pending.length + incoming.length);
+    bytes.set(pending);
+    bytes.set(incoming, pending.length);
+    const usable = bytes.length - (bytes.length % 2);
+    pending = bytes.slice(usable);
+    if (usable > 0) chunks.push(bytes.slice(0, usable));
+  };
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      const raw = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      const line = raw.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const evt = JSON.parse(payload) as { type: string; audio?: string };
+        if (evt.type === "speech.audio.delta" && evt.audio) {
+          const bin = atob(evt.audio);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          collect(bytes);
+        }
+      } catch {
+        /* ignore malformed events */
+      }
+    }
+  }
+
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    merged.set(c, offset);
+    offset += c.length;
+  }
+  const samples = new Int16Array(merged.buffer, merged.byteOffset, Math.floor(merged.length / 2));
+  const floats = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i++) floats[i] = samples[i] / 32768;
+
+  previewSampleCache.set(key, floats);
+  return floats;
+}
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),
@@ -24,29 +103,33 @@ function Settings() {
   const [zip, setZip] = useState("");
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "playing">("idle");
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const previewHandleRef = useRef<SpeechHandle | null>(null);
+  const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const previewCtxRef = useRef<AudioContext | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    return () => {
-      previewHandleRef.current?.stop();
-      previewHandleRef.current = null;
-      previewCtxRef.current?.close().catch(() => {});
-      previewCtxRef.current = null;
-    };
-  }, []);
-
-  function stopPreview() {
-    previewHandleRef.current?.stop();
-    previewHandleRef.current = null;
+  function teardownPreview() {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (previewSourceRef.current) {
+      try { previewSourceRef.current.onended = null; previewSourceRef.current.stop(); } catch { /* noop */ }
+      previewSourceRef.current = null;
+    }
     if (previewCtxRef.current) {
       previewCtxRef.current.close().catch(() => {});
       previewCtxRef.current = null;
     }
+  }
+
+  useEffect(() => {
+    return () => teardownPreview();
+  }, []);
+
+  function stopPreview() {
+    teardownPreview();
     setPreviewState("idle");
   }
 
-  function playPreview() {
+  async function playPreview() {
     if (previewState !== "idle") {
       stopPreview();
       return;
@@ -60,31 +143,41 @@ function Settings() {
       return;
     }
     previewCtxRef.current = ctx;
+    const abort = new AbortController();
+    previewAbortRef.current = abort;
     setPreviewState("loading");
-    previewHandleRef.current = speak(sample, {
-      voice: user.voiceId,
-      speed: user.voiceRate,
-      audioContext: ctx,
-      onStart: () => setPreviewState("playing"),
-      onEnd: () => {
-        previewHandleRef.current = null;
+
+    try {
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      const floats = await fetchPreviewSamples(sample, user.voiceId, user.voiceRate, abort.signal);
+      if (abort.signal.aborted) return;
+      const buffer = ctx.createBuffer(1, floats.length, 24000);
+      buffer.getChannelData(0).set(floats);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        if (previewSourceRef.current === source) previewSourceRef.current = null;
         if (previewCtxRef.current === ctx) {
           ctx.close().catch(() => {});
           previewCtxRef.current = null;
         }
         setPreviewState("idle");
-      },
-      onError: (err) => {
-        setPreviewError(err.message || "Couldn't play preview.");
-        previewHandleRef.current = null;
-        if (previewCtxRef.current === ctx) {
-          ctx.close().catch(() => {});
-          previewCtxRef.current = null;
-        }
-        setPreviewState("idle");
-      },
-    });
+      };
+      previewSourceRef.current = source;
+      source.start(ctx.currentTime + 0.05);
+      setPreviewState("playing");
+    } catch (err) {
+      if (abort.signal.aborted) return;
+      setPreviewError(err instanceof Error ? err.message : "Couldn't play preview.");
+      if (previewCtxRef.current === ctx) {
+        ctx.close().catch(() => {});
+        previewCtxRef.current = null;
+      }
+      setPreviewState("idle");
+    }
   }
+
 
 
   function add() {

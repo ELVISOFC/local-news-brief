@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
-import { VOICE_OPTIONS } from "@/lib/speech";
+import { VOICE_OPTIONS, speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),

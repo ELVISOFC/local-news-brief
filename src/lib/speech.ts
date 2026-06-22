@@ -173,8 +173,12 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
       scheduleEndCheck();
     } catch (err) {
       if (stopped || abort.signal.aborted) return;
+      stopped = true;
+      if (endTimer) clearTimeout(endTimer);
+      scheduledSources.forEach((s) => { try { s.stop(); } catch { /* noop */ } });
+      scheduledSources = [];
+      if (ownsContext) ctx.close().catch(() => {});
       opts.onError?.(err instanceof Error ? err : new Error(String(err)));
-      fireEnd();
     }
   };
 

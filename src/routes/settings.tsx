@@ -152,7 +152,7 @@ function Settings() {
       const floats = await fetchPreviewSamples(sample, user.voiceId, user.voiceRate, abort.signal);
       if (abort.signal.aborted) return;
       const buffer = ctx.createBuffer(1, floats.length, 24000);
-      buffer.copyToChannel(floats, 0);
+      buffer.getChannelData(0).set(floats);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);

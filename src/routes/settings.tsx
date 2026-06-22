@@ -94,8 +94,10 @@ async function fetchPreviewSamples(
   for (let i = 0; i < samples.length; i++) floats[i] = samples[i] / 32768;
 
   previewSampleCache.set(key, floats);
+  void savePreviewSamples(key, floats);
   return floats;
 }
+
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),

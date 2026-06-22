@@ -1,13 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
-import { VOICE_OPTIONS } from "@/lib/speech";
+import { VOICE_OPTIONS, speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Profile — AreaNews" }] }),
@@ -22,6 +22,70 @@ function Settings() {
   const [city, setCity] = useState("");
   const [stateCode, setStateCode] = useState("TX");
   const [zip, setZip] = useState("");
+  const [previewState, setPreviewState] = useState<"idle" | "loading" | "playing">("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewHandleRef = useRef<SpeechHandle | null>(null);
+  const previewCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    return () => {
+      previewHandleRef.current?.stop();
+      previewHandleRef.current = null;
+      previewCtxRef.current?.close().catch(() => {});
+      previewCtxRef.current = null;
+    };
+  }, []);
+
+  function stopPreview() {
+    previewHandleRef.current?.stop();
+    previewHandleRef.current = null;
+    if (previewCtxRef.current) {
+      previewCtxRef.current.close().catch(() => {});
+      previewCtxRef.current = null;
+    }
+    setPreviewState("idle");
+  }
+
+  function playPreview() {
+    if (previewState !== "idle") {
+      stopPreview();
+      return;
+    }
+    setPreviewError(null);
+    const voice = VOICE_OPTIONS.find((v) => v.id === user.voiceId);
+    const sample = `Hi, I'm ${voice?.label ?? "your narrator"}. Here's a quick sample of how your daily briefing will sound.`;
+    const ctx = createAudioContext();
+    if (!ctx) {
+      setPreviewError("Audio playback is not supported in this browser.");
+      return;
+    }
+    previewCtxRef.current = ctx;
+    setPreviewState("loading");
+    previewHandleRef.current = speak(sample, {
+      voice: user.voiceId,
+      speed: user.voiceRate,
+      audioContext: ctx,
+      onStart: () => setPreviewState("playing"),
+      onEnd: () => {
+        previewHandleRef.current = null;
+        if (previewCtxRef.current === ctx) {
+          ctx.close().catch(() => {});
+          previewCtxRef.current = null;
+        }
+        setPreviewState("idle");
+      },
+      onError: (err) => {
+        setPreviewError(err.message || "Couldn't play preview.");
+        previewHandleRef.current = null;
+        if (previewCtxRef.current === ctx) {
+          ctx.close().catch(() => {});
+          previewCtxRef.current = null;
+        }
+        setPreviewState("idle");
+      },
+    });
+  }
+
 
   function add() {
     if (!city.trim()) return;
@@ -136,9 +200,29 @@ function Settings() {
                   ))}
                 </SelectContent>
               </Select>
-              <div className="mt-2 text-xs text-muted-foreground">
-                High-quality AI narration powered by Lovable AI. Streams instantly on play.
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={playPreview}
+                className="mt-3 gap-1.5"
+                aria-label={previewState === "idle" ? "Play voice preview" : "Stop voice preview"}
+              >
+                {previewState === "loading" ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
+                ) : previewState === "playing" ? (
+                  <><Square className="h-4 w-4" /> Stop preview</>
+                ) : (
+                  <><Play className="h-4 w-4" /> Preview voice</>
+                )}
+              </Button>
+              {previewError ? (
+                <div className="mt-2 text-xs text-destructive">{previewError}</div>
+              ) : (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  High-quality AI narration powered by Lovable AI. Streams instantly on play.
+                </div>
+              )}
             </div>
           </div>
         </Section>

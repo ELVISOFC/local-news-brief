@@ -64,7 +64,10 @@ function Player() {
           setIsPlaying(false);
         }
       },
-      onError: (err) => setTtsError(err.message),
+      onError: (err) => {
+        setTtsError(err.message);
+        setIsPlaying(false);
+      },
     });
     handleRef.current = handle;
     return () => {

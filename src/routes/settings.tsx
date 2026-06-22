@@ -103,29 +103,33 @@ function Settings() {
   const [zip, setZip] = useState("");
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "playing">("idle");
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const previewHandleRef = useRef<SpeechHandle | null>(null);
+  const previewSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const previewCtxRef = useRef<AudioContext | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    return () => {
-      previewHandleRef.current?.stop();
-      previewHandleRef.current = null;
-      previewCtxRef.current?.close().catch(() => {});
-      previewCtxRef.current = null;
-    };
-  }, []);
-
-  function stopPreview() {
-    previewHandleRef.current?.stop();
-    previewHandleRef.current = null;
+  function teardownPreview() {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    if (previewSourceRef.current) {
+      try { previewSourceRef.current.onended = null; previewSourceRef.current.stop(); } catch { /* noop */ }
+      previewSourceRef.current = null;
+    }
     if (previewCtxRef.current) {
       previewCtxRef.current.close().catch(() => {});
       previewCtxRef.current = null;
     }
+  }
+
+  useEffect(() => {
+    return () => teardownPreview();
+  }, []);
+
+  function stopPreview() {
+    teardownPreview();
     setPreviewState("idle");
   }
 
-  function playPreview() {
+  async function playPreview() {
     if (previewState !== "idle") {
       stopPreview();
       return;
@@ -139,31 +143,41 @@ function Settings() {
       return;
     }
     previewCtxRef.current = ctx;
+    const abort = new AbortController();
+    previewAbortRef.current = abort;
     setPreviewState("loading");
-    previewHandleRef.current = speak(sample, {
-      voice: user.voiceId,
-      speed: user.voiceRate,
-      audioContext: ctx,
-      onStart: () => setPreviewState("playing"),
-      onEnd: () => {
-        previewHandleRef.current = null;
+
+    try {
+      if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      const floats = await fetchPreviewSamples(sample, user.voiceId, user.voiceRate, abort.signal);
+      if (abort.signal.aborted) return;
+      const buffer = ctx.createBuffer(1, floats.length, 24000);
+      buffer.copyToChannel(floats, 0);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        if (previewSourceRef.current === source) previewSourceRef.current = null;
         if (previewCtxRef.current === ctx) {
           ctx.close().catch(() => {});
           previewCtxRef.current = null;
         }
         setPreviewState("idle");
-      },
-      onError: (err) => {
-        setPreviewError(err.message || "Couldn't play preview.");
-        previewHandleRef.current = null;
-        if (previewCtxRef.current === ctx) {
-          ctx.close().catch(() => {});
-          previewCtxRef.current = null;
-        }
-        setPreviewState("idle");
-      },
-    });
+      };
+      previewSourceRef.current = source;
+      source.start(ctx.currentTime + 0.05);
+      setPreviewState("playing");
+    } catch (err) {
+      if (abort.signal.aborted) return;
+      setPreviewError(err instanceof Error ? err.message : "Couldn't play preview.");
+      if (previewCtxRef.current === ctx) {
+        ctx.close().catch(() => {});
+        previewCtxRef.current = null;
+      }
+      setPreviewState("idle");
+    }
   }
+
 
 
   function add() {

@@ -101,6 +101,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
 
   const playChunk = (incoming: Uint8Array) => {
     if (stopped) return;
+    const decodeStart = performance.now();
     const bytes = new Uint8Array(pending.length + incoming.length);
     bytes.set(pending);
     bytes.set(incoming, pending.length);
@@ -115,13 +116,16 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
+    let underrun = false;
     if (playhead === 0) {
       playhead = ctx.currentTime + 0.05;
       if (!started) {
         started = true;
+        dlog("audio:start", "first chunk scheduled", `ttfa=${Math.round(performance.now() - t0)}ms`);
         opts.onStart?.();
       }
     } else {
+      if (playhead < ctx.currentTime) underrun = true;
       playhead = Math.max(playhead, ctx.currentTime);
     }
     source.start(playhead);
@@ -131,6 +135,15 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     source.onended = () => {
       scheduledSources = scheduledSources.filter((s) => s !== source);
     };
+    const decodeMs = performance.now() - decodeStart;
+    totalDecodeMs += decodeMs;
+    chunkCount += 1;
+    totalBytes += usable;
+    if (underrun) dlog("audio:underrun", "playhead behind ctx", `chunk=${chunkCount}`);
+    // Throttle: log first chunk, then every 20th
+    if (chunkCount === 1 || chunkCount % 20 === 0) {
+      dlog("decode:chunk", `#${chunkCount}`, `${decodeMs.toFixed(1)}ms bytes=${usable}`);
+    }
   };
 
   const run = async () => {

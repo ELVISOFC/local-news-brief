@@ -229,6 +229,8 @@ function Player() {
 
         <div className="safe-bottom mt-4" />
       </div>
+      <DebugToggleButton />
+      <DebugTimeline />
     </div>
   );
 }

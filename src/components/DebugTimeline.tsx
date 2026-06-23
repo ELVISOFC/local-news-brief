@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Bug, X, Trash2 } from "lucide-react";
+import { Bug, X, Trash2, Download } from "lucide-react";
 import {
   getAll,
   subscribe,
@@ -52,6 +52,19 @@ export function DebugTimeline() {
     }
   }, [entries, open]);
 
+  const handleExport = () => {
+    if (entries.length === 0) return;
+    const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tts-debug-log-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!enabled) return null;
 
   return (
@@ -64,6 +77,11 @@ export function DebugTimeline() {
           <Bug className="h-3.5 w-3.5" /> TTS debug ({entries.length})
         </button>
         <div className="flex items-center gap-2">
+          {entries.length > 0 && (
+            <button onClick={handleExport} title="Export JSON" className="opacity-70 hover:opacity-100">
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button onClick={() => clearLog()} title="Clear" className="opacity-70 hover:opacity-100">
             <Trash2 className="h-3.5 w-3.5" />
           </button>

@@ -1,6 +1,7 @@
 // Streaming TTS client backed by the Lovable AI Gateway (openai/gpt-4o-mini-tts).
 // Streams 24kHz PCM via SSE and schedules chunks on a Web Audio context for
 // low-latency playback. Returns a handle that supports stop/pause/resume.
+import { log as dlog } from "@/lib/debug-log";
 
 export type SpeechHandle = {
   stop: () => void;
@@ -64,6 +65,9 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   const ctx = opts.audioContext ?? createAudioContext()!;
   const ownsContext = !opts.audioContext;
   const abort = new AbortController();
+  try {
+    ctx.onstatechange = () => dlog("ctx:state", ctx.state);
+  } catch { /* noop */ }
 
   let playhead = 0;
   let pending = new Uint8Array(0);
@@ -74,10 +78,16 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   let streamDone = false;
   let endFired = false;
   let endTimer: ReturnType<typeof setTimeout> | null = null;
+  let chunkCount = 0;
+  let totalDecodeMs = 0;
+  let totalBytes = 0;
+  let sawFirstChunk = false;
+  const t0 = performance.now();
 
   const fireEnd = () => {
     if (endFired || stopped) return;
     endFired = true;
+    dlog("audio:end", "natural end", `chunks=${chunkCount} bytes=${totalBytes} decode=${totalDecodeMs.toFixed(1)}ms`);
     opts.onEnd?.();
     if (ownsContext) ctx.close().catch(() => {});
   };
@@ -91,6 +101,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
 
   const playChunk = (incoming: Uint8Array) => {
     if (stopped) return;
+    const decodeStart = performance.now();
     const bytes = new Uint8Array(pending.length + incoming.length);
     bytes.set(pending);
     bytes.set(incoming, pending.length);
@@ -105,13 +116,16 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
+    let underrun = false;
     if (playhead === 0) {
       playhead = ctx.currentTime + 0.05;
       if (!started) {
         started = true;
+        dlog("audio:start", "first chunk scheduled", `ttfa=${Math.round(performance.now() - t0)}ms`);
         opts.onStart?.();
       }
     } else {
+      if (playhead < ctx.currentTime) underrun = true;
       playhead = Math.max(playhead, ctx.currentTime);
     }
     source.start(playhead);
@@ -121,11 +135,21 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     source.onended = () => {
       scheduledSources = scheduledSources.filter((s) => s !== source);
     };
+    const decodeMs = performance.now() - decodeStart;
+    totalDecodeMs += decodeMs;
+    chunkCount += 1;
+    totalBytes += usable;
+    if (underrun) dlog("audio:underrun", "playhead behind ctx", `chunk=${chunkCount}`);
+    // Throttle: log first chunk, then every 20th
+    if (chunkCount === 1 || chunkCount % 20 === 0) {
+      dlog("decode:chunk", `#${chunkCount}`, `${decodeMs.toFixed(1)}ms bytes=${usable}`);
+    }
   };
 
   const run = async () => {
     try {
       if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      dlog("request:start", "POST /api/tts", `voice=${opts.voice || DEFAULT_VOICE} speed=${opts.speed ?? 1} chars=${text.length}`);
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,6 +161,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
         }),
         signal: abort.signal,
       });
+      dlog("request:status", `${res.status} ${res.ok ? "ok" : "fail"}`, `headers=${Math.round(performance.now() - t0)}ms`);
       if (!res.ok || !res.body) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || `TTS request failed: ${res.status}`);
@@ -159,6 +184,10 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
           try {
             const evt = JSON.parse(payload) as { type: string; audio?: string };
             if (evt.type === "speech.audio.delta" && evt.audio) {
+              if (!sawFirstChunk) {
+                sawFirstChunk = true;
+                dlog("stream:first-chunk", "first SSE audio delta", `tffc=${Math.round(performance.now() - t0)}ms`);
+              }
               const bin = atob(evt.audio);
               const bytes = new Uint8Array(bin.length);
               for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -170,6 +199,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
         }
       }
       streamDone = true;
+      dlog("stream:done", "SSE complete", `chunks=${chunkCount} bytes=${totalBytes}`);
       scheduleEndCheck();
     } catch (err) {
       if (stopped || abort.signal.aborted) return;
@@ -178,7 +208,9 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
       scheduledSources.forEach((s) => { try { s.stop(); } catch { /* noop */ } });
       scheduledSources = [];
       if (ownsContext) ctx.close().catch(() => {});
-      opts.onError?.(err instanceof Error ? err : new Error(String(err)));
+      const e = err instanceof Error ? err : new Error(String(err));
+      dlog("request:error", e.message);
+      opts.onError?.(e);
     }
   };
 

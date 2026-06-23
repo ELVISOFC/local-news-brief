@@ -6,6 +6,8 @@ import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
 import { speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
 import { StoryArt } from "@/components/StoryArt";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DebugTimeline, DebugToggleButton } from "@/components/DebugTimeline";
+import { log as dlog } from "@/lib/debug-log";
 
 export const Route = createFileRoute("/player")({
   head: () => ({ meta: [{ title: "Briefing — AreaNews" }] }),
@@ -53,6 +55,7 @@ function Player() {
     if (!isPlaying) return;
     const story = stories[index];
     setTtsError(null);
+    dlog("player:story-change", `story ${index + 1}/${stories.length}`, story.headline);
     const handle = speak(story.body, {
       voice: user.voiceId,
       speed: user.voiceRate,
@@ -84,16 +87,16 @@ function Player() {
 
   function togglePlay() {
     if (!isPlaying) {
-      // Create + resume the AudioContext inside the user gesture so browsers
-      // allow playback (autoplay policy). Reuse across stories.
       if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
         audioCtxRef.current = createAudioContext();
       }
       audioCtxRef.current?.resume().catch(() => {});
+      dlog("player:play", "user pressed play");
       setIsPlaying(true);
     } else {
       handleRef.current?.stop();
       handleRef.current = null;
+      dlog("player:pause", "user pressed pause");
       setIsPlaying(false);
     }
   }
@@ -102,6 +105,7 @@ function Player() {
     handleRef.current?.stop();
     handleRef.current = null;
     const next = Math.max(0, Math.min(stories.length - 1, index + delta));
+    dlog("player:seek", `delta ${delta > 0 ? "+" : ""}${delta}`, `→ story ${next + 1}`);
     setIndex(next);
     const e = durations.slice(0, next).reduce((a, b) => a + b, 0);
     setElapsed(e);
@@ -110,6 +114,7 @@ function Player() {
   function setStory(i: number) {
     handleRef.current?.stop();
     handleRef.current = null;
+    dlog("player:seek", `jump`, `→ story ${i + 1}`);
     setIndex(i);
     const e = durations.slice(0, i).reduce((a, b) => a + b, 0);
     setElapsed(e);
@@ -224,6 +229,8 @@ function Player() {
 
         <div className="safe-bottom mt-4" />
       </div>
+      <DebugToggleButton />
+      <DebugTimeline />
     </div>
   );
 }

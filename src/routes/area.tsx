@@ -23,6 +23,10 @@ function AreaPage() {
   const navigate = useNavigate();
   const [generated, setGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [todayLabel, setTodayLabel] = useState("");
+  useEffect(() => {
+    setTodayLabel(new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
+  }, []);
 
   const activeLocation =
     user.locations.find((l) => l.id === user.activeLocationId) ??
@@ -95,7 +99,7 @@ function AreaPage() {
               color: "white",
             }}
           >
-            <div className="text-[11px] uppercase tracking-wider opacity-80">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
+            <div className="text-[11px] uppercase tracking-wider opacity-80" suppressHydrationWarning>{todayLabel}</div>
             <div className="mt-1 flex items-end justify-between">
               <div>
                 <div className="text-2xl font-semibold">5-min briefing</div>

@@ -149,6 +149,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   const run = async () => {
     try {
       if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+      dlog("request:start", "POST /api/tts", `voice=${opts.voice || DEFAULT_VOICE} speed=${opts.speed ?? 1} chars=${text.length}`);
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,6 +161,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
         }),
         signal: abort.signal,
       });
+      dlog("request:status", `${res.status} ${res.ok ? "ok" : "fail"}`, `headers=${Math.round(performance.now() - t0)}ms`);
       if (!res.ok || !res.body) {
         const msg = await res.text().catch(() => "");
         throw new Error(msg || `TTS request failed: ${res.status}`);
@@ -182,6 +184,10 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
           try {
             const evt = JSON.parse(payload) as { type: string; audio?: string };
             if (evt.type === "speech.audio.delta" && evt.audio) {
+              if (!sawFirstChunk) {
+                sawFirstChunk = true;
+                dlog("stream:first-chunk", "first SSE audio delta", `tffc=${Math.round(performance.now() - t0)}ms`);
+              }
               const bin = atob(evt.audio);
               const bytes = new Uint8Array(bin.length);
               for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -193,6 +199,7 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
         }
       }
       streamDone = true;
+      dlog("stream:done", "SSE complete", `chunks=${chunkCount} bytes=${totalBytes}`);
       scheduleEndCheck();
     } catch (err) {
       if (stopped || abort.signal.aborted) return;
@@ -201,7 +208,9 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
       scheduledSources.forEach((s) => { try { s.stop(); } catch { /* noop */ } });
       scheduledSources = [];
       if (ownsContext) ctx.close().catch(() => {});
-      opts.onError?.(err instanceof Error ? err : new Error(String(err)));
+      const e = err instanceof Error ? err : new Error(String(err));
+      dlog("request:error", e.message);
+      opts.onError?.(e);
     }
   };
 

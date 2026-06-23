@@ -1,6 +1,7 @@
 // Streaming TTS client backed by the Lovable AI Gateway (openai/gpt-4o-mini-tts).
 // Streams 24kHz PCM via SSE and schedules chunks on a Web Audio context for
 // low-latency playback. Returns a handle that supports stop/pause/resume.
+import { log as dlog } from "@/lib/debug-log";
 
 export type SpeechHandle = {
   stop: () => void;
@@ -64,6 +65,9 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   const ctx = opts.audioContext ?? createAudioContext()!;
   const ownsContext = !opts.audioContext;
   const abort = new AbortController();
+  try {
+    ctx.onstatechange = () => dlog("ctx:state", ctx.state);
+  } catch { /* noop */ }
 
   let playhead = 0;
   let pending = new Uint8Array(0);
@@ -74,10 +78,16 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
   let streamDone = false;
   let endFired = false;
   let endTimer: ReturnType<typeof setTimeout> | null = null;
+  let chunkCount = 0;
+  let totalDecodeMs = 0;
+  let totalBytes = 0;
+  let sawFirstChunk = false;
+  const t0 = performance.now();
 
   const fireEnd = () => {
     if (endFired || stopped) return;
     endFired = true;
+    dlog("audio:end", "natural end", `chunks=${chunkCount} bytes=${totalBytes} decode=${totalDecodeMs.toFixed(1)}ms`);
     opts.onEnd?.();
     if (ownsContext) ctx.close().catch(() => {});
   };

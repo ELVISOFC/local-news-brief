@@ -1,6 +1,15 @@
 // Lightweight localStorage-backed user store. Swap with Lovable Cloud / Supabase later.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES, type WorldArticle } from "./mockData";
+import type { IncidentKind } from "./incidents";
+
+export type AlertSettings = {
+  enabled: boolean;
+  radiusKm: number; // 0.5 - 25
+  notifyStories: boolean;
+  categories: IncidentKind[]; // empty array = none, full list = all
+};
+
 
 export type Filters = {
   topics: string[];

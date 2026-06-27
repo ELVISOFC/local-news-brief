@@ -13,6 +13,7 @@ import { Route as WorldRouteImport } from './routes/world'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PlayerRouteImport } from './routes/player'
+import { Route as NearbyRouteImport } from './routes/nearby'
 import { Route as AreaRouteImport } from './routes/area'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArticleIdRouteImport } from './routes/article.$id'
@@ -36,6 +37,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const PlayerRoute = PlayerRouteImport.update({
   id: '/player',
   path: '/player',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NearbyRoute = NearbyRouteImport.update({
+  id: '/nearby',
+  path: '/nearby',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AreaRoute = AreaRouteImport.update({
@@ -62,6 +68,7 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/area': typeof AreaRoute
+  '/nearby': typeof NearbyRoute
   '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/area': typeof AreaRoute
+  '/nearby': typeof NearbyRoute
   '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/area': typeof AreaRoute
+  '/nearby': typeof NearbyRoute
   '/player': typeof PlayerRoute
   '/settings': typeof SettingsRoute
   '/welcome': typeof WelcomeRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/area'
+    | '/nearby'
     | '/player'
     | '/settings'
     | '/welcome'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/area'
+    | '/nearby'
     | '/player'
     | '/settings'
     | '/welcome'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/area'
+    | '/nearby'
     | '/player'
     | '/settings'
     | '/welcome'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AreaRoute: typeof AreaRoute
+  NearbyRoute: typeof NearbyRoute
   PlayerRoute: typeof PlayerRoute
   SettingsRoute: typeof SettingsRoute
   WelcomeRoute: typeof WelcomeRoute
@@ -164,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/nearby': {
+      id: '/nearby'
+      path: '/nearby'
+      fullPath: '/nearby'
+      preLoaderRoute: typeof NearbyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/area': {
       id: '/area'
       path: '/area'
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AreaRoute: AreaRoute,
+  NearbyRoute: NearbyRoute,
   PlayerRoute: PlayerRoute,
   SettingsRoute: SettingsRoute,
   WelcomeRoute: WelcomeRoute,

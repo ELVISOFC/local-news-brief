@@ -138,6 +138,22 @@ export const actions = {
   setVoiceRate(r: number) {
     setState((s) => ({ ...s, voiceRate: r }));
   },
+  setAlerts(patch: Partial<AlertSettings>) {
+    setState((s) => ({ ...s, alerts: { ...s.alerts, ...patch } }));
+  },
+  toggleAlertCategory(c: IncidentKind) {
+    setState((s) => {
+      const has = s.alerts.categories.includes(c);
+      return {
+        ...s,
+        alerts: {
+          ...s.alerts,
+          categories: has ? s.alerts.categories.filter((x) => x !== c) : [...s.alerts.categories, c],
+        },
+      };
+    });
+  },
+
   setVoiceId(id: string) {
     setState((s) => ({ ...s, voiceId: id }));
   },

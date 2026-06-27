@@ -27,9 +27,14 @@ export type UserState = {
   filters: Filters;
   voiceRate: number; // 1, 1.25, 1.5, 1.75, 2
   voiceId: string; // Lovable AI voice id (alloy, sage, verse, ...)
+  alerts: AlertSettings;
 };
 
 const KEY = "areanews_state_v1";
+
+const ALL_CATEGORIES: IncidentKind[] = [
+  "theft", "suspicious", "traffic", "fire", "noise", "assault", "vandalism", "lost-pet",
+];
 
 const defaultState: UserState = {
   onboarded: false,
@@ -45,7 +50,16 @@ const defaultState: UserState = {
   },
   voiceRate: 1,
   voiceId: "alloy",
+  alerts: {
+    enabled: true,
+    radiusKm: 3,
+    notifyStories: true,
+    categories: [...ALL_CATEGORIES],
+  },
 };
+
+export { ALL_CATEGORIES };
+
 
 let state: UserState = load();
 const listeners = new Set<() => void>();

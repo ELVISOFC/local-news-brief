@@ -1,11 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { MapPin, Globe2, User } from "lucide-react";
+import { MapPin, Globe2, User, Map } from "lucide-react";
 
 const items = [
   { to: "/area", label: "My Area", Icon: MapPin },
+  { to: "/nearby", label: "Nearby", Icon: Map },
   { to: "/world", label: "World", Icon: Globe2 },
   { to: "/settings", label: "Profile", Icon: User },
 ] as const;
+
 
 export function BottomNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

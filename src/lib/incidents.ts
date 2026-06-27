@@ -83,6 +83,19 @@ export const INCIDENT_META: Record<IncidentKind, { label: string; color: string;
   "lost-pet": { label: "Lost pet", color: "#0d9488", emoji: "🐾" },
 };
 
+// Haversine distance in kilometers.
+export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+
 // Free OpenStreetMap geocoder. No key required, rate-limited to ~1 req/s.
 export async function geocode(query: string): Promise<{ lat: number; lng: number; label: string } | null> {
   const q = query.trim();

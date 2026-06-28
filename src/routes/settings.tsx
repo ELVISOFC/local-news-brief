@@ -337,6 +337,12 @@ function Settings() {
           </div>
         </Section>
 
+        <div className="mt-6">
+          <AlertSettingsCard />
+        </div>
+
+
+
         <div className="my-8">
           <Button variant="outline" className="w-full gap-1.5" onClick={resetAll}>
             <RefreshCw className="h-4 w-4" /> Reset & re-onboard

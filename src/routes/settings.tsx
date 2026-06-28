@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
 import { VOICE_OPTIONS, createAudioContext } from "@/lib/speech";
+import { AlertSettingsCard } from "@/components/Alerts";
+
 import { loadPreviewSamples, savePreviewSamples } from "@/lib/preview-cache";
 
 // Module-level cache of decoded PCM samples keyed by voice|speed|text.

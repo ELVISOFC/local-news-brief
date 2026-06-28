@@ -177,7 +177,7 @@ function NearbyPage() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-3xl border border-border bg-surface shadow-card">
-          <MapView center={center} pins={pins} />
+          <MapView center={center} pins={pins} radiusKm={user.alerts.enabled ? user.alerts.radiusKm : 0} />
         </div>
 
         <h2 className="mt-6 text-base font-semibold">Recent activity</h2>

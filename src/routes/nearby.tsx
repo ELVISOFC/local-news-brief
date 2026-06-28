@@ -225,7 +225,7 @@ function NearbyPage() {
 }
 
 // react-leaflet uses `window` at import time, so load only on the client.
-function MapView({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
+function MapView({ center, pins, radiusKm }: { center: { lat: number; lng: number }; pins: Pin[]; radiusKm: number }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) {
@@ -235,10 +235,10 @@ function MapView({ center, pins }: { center: { lat: number; lng: number }; pins:
       </div>
     );
   }
-  return <ClientMap center={center} pins={pins} />;
+  return <ClientMap center={center} pins={pins} radiusKm={radiusKm} />;
 }
 
-function ClientMap({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
+function ClientMap({ center, pins, radiusKm }: { center: { lat: number; lng: number }; pins: Pin[]; radiusKm: number }) {
   // Dynamic imports keep leaflet out of the SSR bundle.
   const mapRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<any>(null);
@@ -269,14 +269,28 @@ function ClientMap({ center, pins }: { center: { lat: number; lng: number }; pin
       }
       const group = L.layerGroup();
 
-      // "You are here" ring
+      // "You are here" marker
       L.circle([center.lat, center.lng], {
-        radius: 350,
-        color: "oklch(0.42 0.09 215)",
-        fillColor: "oklch(0.42 0.09 215)",
-        fillOpacity: 0.08,
+        radius: 120,
+        color: "#0f172a",
+        fillColor: "#0f172a",
+        fillOpacity: 0.25,
         weight: 1.5,
       }).addTo(group);
+
+      // Alert radius ring (driven by user settings).
+      if (radiusKm > 0) {
+        L.circle([center.lat, center.lng], {
+          radius: radiusKm * 1000,
+          color: "#2563eb",
+          fillColor: "#2563eb",
+          fillOpacity: 0.06,
+          weight: 1.5,
+          dashArray: "4 6",
+        }).addTo(group);
+      }
+
+
 
       for (const p of pins) {
         const meta = p.kind === "story" ? null : INCIDENT_META[p.kind];

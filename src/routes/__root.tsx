@@ -120,6 +120,19 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <SonnerToaster />
     </QueryClientProvider>
   );
 }
+
+function SonnerToaster() {
+  // Client-only import to keep SSR bundle slim.
+  const [Comp, setComp] = useState<null | (() => ReactNode)>(null);
+  useEffect(() => {
+    import("sonner").then((m) => {
+      setComp(() => () => <m.Toaster position="top-center" richColors closeButton />);
+    });
+  }, []);
+  return Comp ? <Comp /> : null;
+}
+

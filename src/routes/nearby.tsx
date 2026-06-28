@@ -325,7 +325,7 @@ function ClientMap({ center, pins, radiusKm }: { center: { lat: number; lng: num
     return () => {
       cancelled = true;
     };
-  }, [center.lat, center.lng, pins]);
+  }, [center.lat, center.lng, pins, radiusKm]);
 
   useEffect(() => {
     return () => {

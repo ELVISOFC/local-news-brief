@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/BottomNav";
 import { useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
-import { generateIncidents, geocode, INCIDENT_META, type Pin } from "@/lib/incidents";
+import { generateIncidents, geocode, INCIDENT_META, distanceKm, type Pin } from "@/lib/incidents";
+import { AlertsBell, raiseAlertsForPins } from "@/components/Alerts";
+
 
 export const Route = createFileRoute("/nearby")({
   head: () => ({
@@ -114,17 +116,30 @@ function NearbyPage() {
     }
   }
 
+  // Raise in-app alerts for pins matching the user's preferences.
+  useEffect(() => {
+    if (!pins.length) return;
+    raiseAlertsForPins(pins, center, user, distanceKm);
+  }, [pins, center, user]);
+
   return (
     <PageShell>
       <div className="px-5 pt-8">
-        <div className="flex items-center gap-1.5 text-primary">
-          <MapPinIcon className="h-4 w-4" />
-          <span className="text-sm font-semibold">Nearby</span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-primary">
+              <MapPinIcon className="h-4 w-4" />
+              <span className="text-sm font-semibold">Nearby</span>
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold leading-tight">What's happening around you</h1>
+            <p className="mt-1 text-sm text-muted-foreground line-clamp-1" title={center.label}>
+              {center.label}
+            </p>
+          </div>
+          <AlertsBell />
         </div>
-        <h1 className="mt-2 text-2xl font-semibold leading-tight">What's happening around you</h1>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-1" title={center.label}>
-          {center.label}
-        </p>
+
+
 
         <form onSubmit={runSearch} className="mt-4 flex gap-2">
           <div className="relative flex-1">
@@ -162,7 +177,7 @@ function NearbyPage() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-3xl border border-border bg-surface shadow-card">
-          <MapView center={center} pins={pins} />
+          <MapView center={center} pins={pins} radiusKm={user.alerts.enabled ? user.alerts.radiusKm : 0} />
         </div>
 
         <h2 className="mt-6 text-base font-semibold">Recent activity</h2>
@@ -210,7 +225,7 @@ function NearbyPage() {
 }
 
 // react-leaflet uses `window` at import time, so load only on the client.
-function MapView({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
+function MapView({ center, pins, radiusKm }: { center: { lat: number; lng: number }; pins: Pin[]; radiusKm: number }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) {
@@ -220,10 +235,10 @@ function MapView({ center, pins }: { center: { lat: number; lng: number }; pins:
       </div>
     );
   }
-  return <ClientMap center={center} pins={pins} />;
+  return <ClientMap center={center} pins={pins} radiusKm={radiusKm} />;
 }
 
-function ClientMap({ center, pins }: { center: { lat: number; lng: number }; pins: Pin[] }) {
+function ClientMap({ center, pins, radiusKm }: { center: { lat: number; lng: number }; pins: Pin[]; radiusKm: number }) {
   // Dynamic imports keep leaflet out of the SSR bundle.
   const mapRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<any>(null);
@@ -254,14 +269,28 @@ function ClientMap({ center, pins }: { center: { lat: number; lng: number }; pin
       }
       const group = L.layerGroup();
 
-      // "You are here" ring
+      // "You are here" marker
       L.circle([center.lat, center.lng], {
-        radius: 350,
-        color: "oklch(0.42 0.09 215)",
-        fillColor: "oklch(0.42 0.09 215)",
-        fillOpacity: 0.08,
+        radius: 120,
+        color: "#0f172a",
+        fillColor: "#0f172a",
+        fillOpacity: 0.25,
         weight: 1.5,
       }).addTo(group);
+
+      // Alert radius ring (driven by user settings).
+      if (radiusKm > 0) {
+        L.circle([center.lat, center.lng], {
+          radius: radiusKm * 1000,
+          color: "#2563eb",
+          fillColor: "#2563eb",
+          fillOpacity: 0.06,
+          weight: 1.5,
+          dashArray: "4 6",
+        }).addTo(group);
+      }
+
+
 
       for (const p of pins) {
         const meta = p.kind === "story" ? null : INCIDENT_META[p.kind];
@@ -296,7 +325,7 @@ function ClientMap({ center, pins }: { center: { lat: number; lng: number }; pin
     return () => {
       cancelled = true;
     };
-  }, [center.lat, center.lng, pins]);
+  }, [center.lat, center.lng, pins, radiusKm]);
 
   useEffect(() => {
     return () => {

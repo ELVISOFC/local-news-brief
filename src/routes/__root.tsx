@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -120,6 +120,19 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <SonnerToaster />
     </QueryClientProvider>
   );
 }
+
+function SonnerToaster() {
+  // Client-only import to keep SSR bundle slim.
+  const [Comp, setComp] = useState<null | (() => ReactNode)>(null);
+  useEffect(() => {
+    import("sonner").then((m) => {
+      setComp(() => () => <m.Toaster position="top-center" richColors closeButton />);
+    });
+  }, []);
+  return Comp ? <Comp /> : null;
+}
+

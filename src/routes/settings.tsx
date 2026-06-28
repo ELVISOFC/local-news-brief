@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { actions, useUser } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
 import { VOICE_OPTIONS, createAudioContext } from "@/lib/speech";
+import { AlertSettingsCard } from "@/components/Alerts";
+
 import { loadPreviewSamples, savePreviewSamples } from "@/lib/preview-cache";
 
 // Module-level cache of decoded PCM samples keyed by voice|speed|text.
@@ -336,6 +338,12 @@ function Settings() {
             {user.bookmarks.length} saved {user.bookmarks.length === 1 ? "article" : "articles"}.
           </div>
         </Section>
+
+        <div className="mt-6">
+          <AlertSettingsCard />
+        </div>
+
+
 
         <div className="my-8">
           <Button variant="outline" className="w-full gap-1.5" onClick={resetAll}>

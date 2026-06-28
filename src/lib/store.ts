@@ -1,6 +1,15 @@
 // Lightweight localStorage-backed user store. Swap with Lovable Cloud / Supabase later.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES, type WorldArticle } from "./mockData";
+import type { IncidentKind } from "./incidents";
+
+export type AlertSettings = {
+  enabled: boolean;
+  radiusKm: number; // 0.5 - 25
+  notifyStories: boolean;
+  categories: IncidentKind[]; // empty array = none, full list = all
+};
+
 
 export type Filters = {
   topics: string[];
@@ -18,9 +27,14 @@ export type UserState = {
   filters: Filters;
   voiceRate: number; // 1, 1.25, 1.5, 1.75, 2
   voiceId: string; // Lovable AI voice id (alloy, sage, verse, ...)
+  alerts: AlertSettings;
 };
 
 const KEY = "areanews_state_v1";
+
+const ALL_CATEGORIES: IncidentKind[] = [
+  "theft", "suspicious", "traffic", "fire", "noise", "assault", "vandalism", "lost-pet",
+];
 
 const defaultState: UserState = {
   onboarded: false,
@@ -36,7 +50,16 @@ const defaultState: UserState = {
   },
   voiceRate: 1,
   voiceId: "alloy",
+  alerts: {
+    enabled: true,
+    radiusKm: 3,
+    notifyStories: true,
+    categories: [...ALL_CATEGORIES],
+  },
 };
+
+export { ALL_CATEGORIES };
+
 
 let state: UserState = load();
 const listeners = new Set<() => void>();
@@ -115,6 +138,22 @@ export const actions = {
   setVoiceRate(r: number) {
     setState((s) => ({ ...s, voiceRate: r }));
   },
+  setAlerts(patch: Partial<AlertSettings>) {
+    setState((s) => ({ ...s, alerts: { ...s.alerts, ...patch } }));
+  },
+  toggleAlertCategory(c: IncidentKind) {
+    setState((s) => {
+      const has = s.alerts.categories.includes(c);
+      return {
+        ...s,
+        alerts: {
+          ...s.alerts,
+          categories: has ? s.alerts.categories.filter((x) => x !== c) : [...s.alerts.categories, c],
+        },
+      };
+    });
+  },
+
   setVoiceId(id: string) {
     setState((s) => ({ ...s, voiceId: id }));
   },

@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/BottomNav";
 import { useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
-import { generateIncidents, geocode, INCIDENT_META, type Pin } from "@/lib/incidents";
+import { generateIncidents, geocode, INCIDENT_META, distanceKm, type Pin } from "@/lib/incidents";
+import { AlertsBell, raiseAlertsForPins } from "@/components/Alerts";
+
 
 export const Route = createFileRoute("/nearby")({
   head: () => ({

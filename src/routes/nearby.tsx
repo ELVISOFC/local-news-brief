@@ -116,17 +116,30 @@ function NearbyPage() {
     }
   }
 
+  // Raise in-app alerts for pins matching the user's preferences.
+  useEffect(() => {
+    if (!pins.length) return;
+    raiseAlertsForPins(pins, center, user, distanceKm);
+  }, [pins, center, user]);
+
   return (
     <PageShell>
       <div className="px-5 pt-8">
-        <div className="flex items-center gap-1.5 text-primary">
-          <MapPinIcon className="h-4 w-4" />
-          <span className="text-sm font-semibold">Nearby</span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-primary">
+              <MapPinIcon className="h-4 w-4" />
+              <span className="text-sm font-semibold">Nearby</span>
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold leading-tight">What's happening around you</h1>
+            <p className="mt-1 text-sm text-muted-foreground line-clamp-1" title={center.label}>
+              {center.label}
+            </p>
+          </div>
+          <AlertsBell />
         </div>
-        <h1 className="mt-2 text-2xl font-semibold leading-tight">What's happening around you</h1>
-        <p className="mt-1 text-sm text-muted-foreground line-clamp-1" title={center.label}>
-          {center.label}
-        </p>
+
+
 
         <form onSubmit={runSearch} className="mt-4 flex gap-2">
           <div className="relative flex-1">

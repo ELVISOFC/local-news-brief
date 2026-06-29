@@ -109,8 +109,10 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
     pending = bytes.slice(usable);
     if (usable === 0) return;
     const samples = new Int16Array(bytes.buffer, 0, usable / 2);
+    if (samples.length === 0) return;
     const floats = new Float32Array(samples.length);
     for (let i = 0; i < samples.length; i++) floats[i] = samples[i] / 32768;
+    if (floats.length === 0) return;
     const buffer = ctx.createBuffer(1, floats.length, 24000);
     buffer.copyToChannel(floats, 0);
     const source = ctx.createBufferSource();

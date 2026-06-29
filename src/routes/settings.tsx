@@ -24,10 +24,10 @@ async function fetchPreviewSamples(
 ): Promise<Float32Array> {
   const key = `${voice}|${speed}|${text}`;
   const cached = previewSampleCache.get(key);
-  if (cached) return cached;
+  if (cached && cached.length > 0) return cached;
 
   const persisted = await loadPreviewSamples(key);
-  if (persisted) {
+  if (persisted && persisted.length > 0) {
     previewSampleCache.set(key, persisted);
     return persisted;
   }
@@ -95,8 +95,10 @@ async function fetchPreviewSamples(
   const floats = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) floats[i] = samples[i] / 32768;
 
-  previewSampleCache.set(key, floats);
-  void savePreviewSamples(key, floats);
+  if (floats.length > 0) {
+    previewSampleCache.set(key, floats);
+    void savePreviewSamples(key, floats);
+  }
   return floats;
 }
 
@@ -164,6 +166,7 @@ function Settings() {
       if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       const floats = await fetchPreviewSamples(sample, user.voiceId, user.voiceRate, abort.signal);
       if (abort.signal.aborted) return;
+      if (!floats.length) throw new Error("No audio was returned for this voice.");
       const buffer = ctx.createBuffer(1, floats.length, 24000);
       buffer.getChannelData(0).set(floats);
       const source = ctx.createBufferSource();

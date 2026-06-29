@@ -24,10 +24,10 @@ async function fetchPreviewSamples(
 ): Promise<Float32Array> {
   const key = `${voice}|${speed}|${text}`;
   const cached = previewSampleCache.get(key);
-  if (cached) return cached;
+  if (cached && cached.length > 0) return cached;
 
   const persisted = await loadPreviewSamples(key);
-  if (persisted) {
+  if (persisted && persisted.length > 0) {
     previewSampleCache.set(key, persisted);
     return persisted;
   }

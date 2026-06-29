@@ -95,8 +95,10 @@ async function fetchPreviewSamples(
   const floats = new Float32Array(samples.length);
   for (let i = 0; i < samples.length; i++) floats[i] = samples[i] / 32768;
 
-  previewSampleCache.set(key, floats);
-  void savePreviewSamples(key, floats);
+  if (floats.length > 0) {
+    previewSampleCache.set(key, floats);
+    void savePreviewSamples(key, floats);
+  }
   return floats;
 }
 

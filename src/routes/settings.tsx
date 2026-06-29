@@ -164,6 +164,7 @@ function Settings() {
       if (ctx.state === "suspended") await ctx.resume().catch(() => {});
       const floats = await fetchPreviewSamples(sample, user.voiceId, user.voiceRate, abort.signal);
       if (abort.signal.aborted) return;
+      if (!floats.length) throw new Error("No audio was returned for this voice.");
       const buffer = ctx.createBuffer(1, floats.length, 24000);
       buffer.getChannelData(0).set(floats);
       const source = ctx.createBufferSource();

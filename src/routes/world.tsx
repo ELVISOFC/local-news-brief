@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, Zap, Newspaper } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,14 @@ function WorldPage() {
     () => applyFilters(WORLD_ARTICLES, { ...user.filters, keyword: q }),
     [user.filters, q],
   );
+
+  const breaking = useMemo(() => {
+    const cutoff = Date.now() - 2 * 3600 * 1000;
+    return WORLD_ARTICLES
+      .filter((a) => new Date(a.publishedAt).getTime() >= cutoff)
+      .filter((a) => user.filters.sources.includes(a.source))
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  }, [user.filters.sources]);
 
   return (
     <PageShell>
@@ -55,9 +63,18 @@ function WorldPage() {
 
         <ActiveChips />
 
-        <div className="mt-4 text-xs text-muted-foreground">
-          {filtered.length} {filtered.length === 1 ? "story" : "stories"} matching your filters
+        <BreakingSection articles={breaking} />
+
+        <OutletsPicker />
+
+        <div className="mt-6 flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-muted-foreground" />
+          <div className="text-sm font-medium">All stories</div>
+          <div className="ml-auto text-xs text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? "story" : "stories"}
+          </div>
         </div>
+
 
         <div className="mt-3 space-y-3 pb-6">
           {filtered.length === 0 ? (
@@ -225,4 +242,90 @@ function timeAgo(iso: string) {
   if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.round(diff / 3600)}h ago`;
   return `${Math.round(diff / 86400)}d ago`;
+}
+
+function BreakingSection({ articles }: { articles: typeof WORLD_ARTICLES }) {
+  if (articles.length === 0) return null;
+  return (
+    <div className="mt-5">
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+        </span>
+        <Zap className="h-4 w-4 text-red-500" />
+        <div className="text-sm font-semibold">Breaking · last 2 hours</div>
+        <div className="ml-auto text-xs text-muted-foreground">{articles.length}</div>
+      </div>
+
+      <div className="mt-2 -mx-5 overflow-x-auto pb-1">
+        <div className="flex gap-3 px-5">
+          {articles.map((a) => (
+            <Link
+              key={a.id}
+              to="/article/$id"
+              params={{ id: a.id }}
+              className="w-64 shrink-0 rounded-2xl border border-red-500/40 bg-surface p-3 shadow-card"
+            >
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-red-500">
+                <Zap className="h-3 w-3" /> Breaking
+                <span className="ml-auto text-muted-foreground normal-case tracking-normal">{timeAgo(a.publishedAt)}</span>
+              </div>
+              <div className="mt-2"><StoryArt hue={a.imageHue} /></div>
+              <div className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{a.headline}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{a.source} · {a.topic}</div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OutletsPicker() {
+  const user = useUser();
+  const selected = user.filters.sources;
+  const allOn = selected.length === SOURCES.length;
+  function toggle(s: string) {
+    actions.setFilters({
+      sources: selected.includes(s) ? selected.filter((x) => x !== s) : [...selected, s],
+    });
+  }
+  return (
+    <div className="mt-5 rounded-2xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-2">
+        <Newspaper className="h-4 w-4 text-primary" />
+        <div className="text-sm font-medium">Your outlets</div>
+        <div className="ml-auto text-xs text-muted-foreground">
+          {selected.length}/{SOURCES.length}
+        </div>
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        Choose which publishers appear in your feed and breaking section.
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {SOURCES.map((s) => (
+          <button key={s} onClick={() => toggle(s)} className={chip(selected.includes(s))}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex gap-3">
+        <button
+          onClick={() => actions.setFilters({ sources: [...SOURCES] })}
+          disabled={allOn}
+          className="text-xs text-primary disabled:text-muted-foreground disabled:cursor-not-allowed"
+        >
+          Select all
+        </button>
+        <button
+          onClick={() => actions.setFilters({ sources: [] })}
+          disabled={selected.length === 0}
+          className="text-xs text-primary disabled:text-muted-foreground disabled:cursor-not-allowed"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
 }

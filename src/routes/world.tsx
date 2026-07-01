@@ -63,9 +63,18 @@ function WorldPage() {
 
         <ActiveChips />
 
-        <div className="mt-4 text-xs text-muted-foreground">
-          {filtered.length} {filtered.length === 1 ? "story" : "stories"} matching your filters
+        <BreakingSection articles={breaking} />
+
+        <OutletsPicker />
+
+        <div className="mt-6 flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-muted-foreground" />
+          <div className="text-sm font-medium">All stories</div>
+          <div className="ml-auto text-xs text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? "story" : "stories"}
+          </div>
         </div>
+
 
         <div className="mt-3 space-y-3 pb-6">
           {filtered.length === 0 ? (

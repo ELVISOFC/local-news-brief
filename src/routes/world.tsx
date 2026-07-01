@@ -28,6 +28,14 @@ function WorldPage() {
     [user.filters, q],
   );
 
+  const breaking = useMemo(() => {
+    const cutoff = Date.now() - 2 * 3600 * 1000;
+    return WORLD_ARTICLES
+      .filter((a) => new Date(a.publishedAt).getTime() >= cutoff)
+      .filter((a) => user.filters.sources.includes(a.source))
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  }, [user.filters.sources]);
+
   return (
     <PageShell>
       <div className="px-5 pt-8">

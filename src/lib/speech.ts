@@ -171,15 +171,23 @@ export function speak(text: string, opts: SpeakOpts = {}): SpeechHandle {
 
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
+      const findBoundary = (s: string): { idx: number; len: number } => {
+        const a = s.indexOf("\r\n\r\n");
+        const b = s.indexOf("\n\n");
+        if (a === -1 && b === -1) return { idx: -1, len: 0 };
+        if (a === -1) return { idx: b, len: 2 };
+        if (b === -1) return { idx: a, len: 4 };
+        return a < b ? { idx: a, len: 4 } : { idx: b, len: 2 };
+      };
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += value;
-        let idx;
-        while ((idx = buffer.indexOf("\n\n")) !== -1) {
-          const raw = buffer.slice(0, idx);
-          buffer = buffer.slice(idx + 2);
-          const line = raw.split("\n").find((l) => l.startsWith("data:"));
+        let b;
+        while ((b = findBoundary(buffer)).idx !== -1) {
+          const raw = buffer.slice(0, b.idx);
+          buffer = buffer.slice(b.idx + b.len);
+          const line = raw.split(/\r?\n/).find((l) => l.startsWith("data:"));
           if (!line) continue;
           const payload = line.slice(5).trim();
           if (!payload || payload === "[DONE]") continue;

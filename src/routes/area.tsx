@@ -33,10 +33,23 @@ function AreaPage() {
     user.locations[0] ??
     SAMPLE_LOCATIONS[0];
 
-  const briefing = useMemo(() => getBriefing(activeLocation.id) ?? getBriefing("austin")!, [activeLocation.id]);
+  const briefing = useMemo(() => {
+    const base = getBriefing(activeLocation.id) ?? getBriefing("austin")!;
+    const picks = user.filters.sources;
+    // Filter briefing stories to the user's saved outlets. If none of the
+    // briefing sources are selected, fall back to the full set so the user
+    // still gets a briefing rather than an empty one.
+    const filtered = base.stories.filter((s) => picks.includes(s.source));
+    return { ...base, stories: filtered.length > 0 ? filtered : base.stories };
+  }, [activeLocation.id, user.filters.sources]);
 
-  // Persist generated state per day per location in localStorage
-  const storageKey = `briefing_ready_${briefing.locationId}_${briefing.date}`;
+  // Persist generated state per day per location AND outlet selection so a
+  // changed outlet list forces a fresh briefing instead of showing a stale one.
+  const outletSig = useMemo(
+    () => [...user.filters.sources].sort().join("|"),
+    [user.filters.sources],
+  );
+  const storageKey = `briefing_ready_${briefing.locationId}_${briefing.date}_${outletSig}`;
   useEffect(() => {
     if (typeof window === "undefined") return;
     setGenerated(localStorage.getItem(storageKey) === "1");

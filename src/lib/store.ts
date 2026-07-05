@@ -1,6 +1,7 @@
 // Lightweight localStorage-backed user store. Swap with Lovable Cloud / Supabase later.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES, type WorldArticle } from "./mockData";
+import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES as MOCK_SOURCES, type WorldArticle } from "./mockData";
+const SOURCES = MOCK_SOURCES;
 import type { IncidentKind } from "./incidents";
 
 export type AlertSettings = {

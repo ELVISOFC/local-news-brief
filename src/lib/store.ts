@@ -174,7 +174,10 @@ export function applyFilters(articles: WorldArticle[], f: Filters): WorldArticle
   return articles.filter((a) => {
     if (!f.topics.includes(a.topic)) return false;
     if (!f.regions.includes(a.region)) return false;
-    if (!f.sources.includes(a.source)) return false;
+    // Only enforce the source filter for outlets we know about (the curated
+    // mock list). Live Google News feeds surface many other publishers and
+    // we let those through until users can toggle them explicitly.
+    if (SOURCES.includes(a.source) && !f.sources.includes(a.source)) return false;
     if (now - new Date(a.publishedAt).getTime() > maxAge) return false;
     if (kw && !(a.headline + " " + a.body).toLowerCase().includes(kw)) return false;
     return true;

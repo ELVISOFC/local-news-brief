@@ -58,7 +58,22 @@ function WorldPage() {
     <PageShell>
       <div className="px-5 pt-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">World</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">World</h1>
+            {liveQuery.isLoading ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <Radio className="h-3 w-3 animate-pulse" /> Loading
+              </span>
+            ) : isLive ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                <Radio className="h-3 w-3" /> Live
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                Sample
+              </span>
+            )}
+          </div>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
@@ -68,6 +83,7 @@ function WorldPage() {
             <FilterSheet />
           </Sheet>
         </div>
+
 
         <div className="mt-4 relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

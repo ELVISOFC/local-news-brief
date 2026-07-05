@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, X, Zap, Newspaper } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, SlidersHorizontal, X, Zap, Newspaper, Radio } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/BottomNav";
 import { StoryArt } from "@/components/StoryArt";
 import { actions, applyFilters, useUser } from "@/lib/store";
-import { REGIONS, SOURCES, TOPICS, WORLD_ARTICLES } from "@/lib/mockData";
+import { REGIONS, SOURCES, TOPICS, WORLD_ARTICLES, type WorldArticle } from "@/lib/mockData";
+import { fetchWorldArticles, cacheArticles } from "@/lib/news";
 
 export const Route = createFileRoute("/world")({
   head: () => ({
@@ -23,18 +25,34 @@ function WorldPage() {
   const user = useUser();
   const [q, setQ] = useState(user.filters.keyword);
 
+  const topicsKey = useMemo(() => [...user.filters.topics].sort().join(","), [user.filters.topics]);
+  const liveQuery = useQuery({
+    queryKey: ["world-news", topicsKey],
+    queryFn: () => fetchWorldArticles(user.filters.topics),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (liveQuery.data && liveQuery.data.length > 0) cacheArticles(liveQuery.data);
+  }, [liveQuery.data]);
+
+  const isLive = !!liveQuery.data && liveQuery.data.length > 0;
+  const articles: WorldArticle[] = isLive ? (liveQuery.data as WorldArticle[]) : WORLD_ARTICLES;
+
   const filtered = useMemo(
-    () => applyFilters(WORLD_ARTICLES, { ...user.filters, keyword: q }),
-    [user.filters, q],
+    () => applyFilters(articles, { ...user.filters, keyword: q }),
+    [articles, user.filters, q],
   );
 
   const breaking = useMemo(() => {
-    const cutoff = Date.now() - 2 * 3600 * 1000;
-    return WORLD_ARTICLES
+    const cutoff = Date.now() - 6 * 3600 * 1000;
+    return articles
       .filter((a) => new Date(a.publishedAt).getTime() >= cutoff)
-      .filter((a) => user.filters.sources.includes(a.source))
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-  }, [user.filters.sources]);
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice(0, 12);
+  }, [articles]);
+
 
   return (
     <PageShell>

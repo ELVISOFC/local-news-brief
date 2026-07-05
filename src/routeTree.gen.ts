@@ -18,6 +18,9 @@ import { Route as AreaRouteImport } from './routes/area'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArticleIdRouteImport } from './routes/article.$id'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
+import { Route as ApiNewsWorldRouteImport } from './routes/api/news.world'
+import { Route as ApiNewsSummarizeRouteImport } from './routes/api/news.summarize'
+import { Route as ApiNewsLocalRouteImport } from './routes/api/news.local'
 
 const WorldRoute = WorldRouteImport.update({
   id: '/world',
@@ -64,6 +67,21 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
   path: '/api/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNewsWorldRoute = ApiNewsWorldRouteImport.update({
+  id: '/api/news/world',
+  path: '/api/news/world',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNewsSummarizeRoute = ApiNewsSummarizeRouteImport.update({
+  id: '/api/news/summarize',
+  path: '/api/news/summarize',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNewsLocalRoute = ApiNewsLocalRouteImport.update({
+  id: '/api/news/local',
+  path: '/api/news/local',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +93,9 @@ export interface FileRoutesByFullPath {
   '/world': typeof WorldRoute
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
+  '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +107,9 @@ export interface FileRoutesByTo {
   '/world': typeof WorldRoute
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
+  '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +122,9 @@ export interface FileRoutesById {
   '/world': typeof WorldRoute
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
+  '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +138,9 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/tts'
     | '/article/$id'
+    | '/api/news/local'
+    | '/api/news/summarize'
+    | '/api/news/world'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +152,9 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/tts'
     | '/article/$id'
+    | '/api/news/local'
+    | '/api/news/summarize'
+    | '/api/news/world'
   id:
     | '__root__'
     | '/'
@@ -133,6 +166,9 @@ export interface FileRouteTypes {
     | '/world'
     | '/api/tts'
     | '/article/$id'
+    | '/api/news/local'
+    | '/api/news/summarize'
+    | '/api/news/world'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +181,9 @@ export interface RootRouteChildren {
   WorldRoute: typeof WorldRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ArticleIdRoute: typeof ArticleIdRoute
+  ApiNewsLocalRoute: typeof ApiNewsLocalRoute
+  ApiNewsSummarizeRoute: typeof ApiNewsSummarizeRoute
+  ApiNewsWorldRoute: typeof ApiNewsWorldRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +251,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/news/world': {
+      id: '/api/news/world'
+      path: '/api/news/world'
+      fullPath: '/api/news/world'
+      preLoaderRoute: typeof ApiNewsWorldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/news/summarize': {
+      id: '/api/news/summarize'
+      path: '/api/news/summarize'
+      fullPath: '/api/news/summarize'
+      preLoaderRoute: typeof ApiNewsSummarizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/news/local': {
+      id: '/api/news/local'
+      path: '/api/news/local'
+      fullPath: '/api/news/local'
+      preLoaderRoute: typeof ApiNewsLocalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,17 +285,10 @@ const rootRouteChildren: RootRouteChildren = {
   WorldRoute: WorldRoute,
   ApiTtsRoute: ApiTtsRoute,
   ArticleIdRoute: ArticleIdRoute,
+  ApiNewsLocalRoute: ApiNewsLocalRoute,
+  ApiNewsSummarizeRoute: ApiNewsSummarizeRoute,
+  ApiNewsWorldRoute: ApiNewsWorldRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

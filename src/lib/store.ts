@@ -1,6 +1,7 @@
 // Lightweight localStorage-backed user store. Swap with Lovable Cloud / Supabase later.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES, type WorldArticle } from "./mockData";
+import { SAMPLE_LOCATIONS, type Location, TOPICS, REGIONS, SOURCES as MOCK_SOURCES, type WorldArticle } from "./mockData";
+const SOURCES = MOCK_SOURCES;
 import type { IncidentKind } from "./incidents";
 
 export type AlertSettings = {
@@ -173,7 +174,10 @@ export function applyFilters(articles: WorldArticle[], f: Filters): WorldArticle
   return articles.filter((a) => {
     if (!f.topics.includes(a.topic)) return false;
     if (!f.regions.includes(a.region)) return false;
-    if (!f.sources.includes(a.source)) return false;
+    // Only enforce the source filter for outlets we know about (the curated
+    // mock list). Live Google News feeds surface many other publishers and
+    // we let those through until users can toggle them explicitly.
+    if (SOURCES.includes(a.source) && !f.sources.includes(a.source)) return false;
     if (now - new Date(a.publishedAt).getTime() > maxAge) return false;
     if (kw && !(a.headline + " " + a.body).toLowerCase().includes(kw)) return false;
     return true;

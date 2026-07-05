@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bookmark, Pause, Play, Share2 } from "lucide-react";
 import { WORLD_ARTICLES } from "@/lib/mockData";
 import { getBriefing } from "@/lib/mockData";
+import { getCachedArticle } from "@/lib/news";
 import { actions, useUser } from "@/lib/store";
 import { StoryArt } from "@/components/StoryArt";
 import { speak, isSpeechSupported, type SpeechHandle } from "@/lib/speech";
@@ -24,8 +25,13 @@ function Article() {
   const [playing, setPlaying] = useState(false);
   const handleRef = useRef<SpeechHandle | null>(null);
 
-  // Look up across world articles and all sample local stories
+  // Look up in the live cache first, then world articles, then sample briefings.
   const item = useMemo(() => {
+    const cached = getCachedArticle(id);
+    if (cached) {
+      const category = "topic" in cached ? (cached as { topic: string }).topic : (cached as { category: string }).category;
+      return { ...cached, category } as typeof cached & { category: string };
+    }
     const w = WORLD_ARTICLES.find((a) => a.id === id);
     if (w) return { ...w, category: w.topic, source: w.source };
     for (const locId of ["austin", "miami", "sf"]) {

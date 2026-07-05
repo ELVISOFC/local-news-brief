@@ -1,12 +1,26 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Headphones, Play, Sparkles, Clock, Bookmark } from "lucide-react";
+import { ChevronDown, Headphones, Play, Sparkles, Clock, Bookmark, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PageShell } from "@/components/BottomNav";
 import { StoryArt } from "@/components/StoryArt";
 import { actions, useUser } from "@/lib/store";
-import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
+import { getBriefing, SAMPLE_LOCATIONS, type Briefing } from "@/lib/mockData";
+import {
+  fetchLocalStories,
+  summarizeStories,
+  saveBriefing,
+  loadBriefing,
+  cacheArticles,
+  outletSignature,
+  todayKey,
+} from "@/lib/news";
 
 export const Route = createFileRoute("/area")({
   head: () => ({
@@ -21,11 +35,14 @@ export const Route = createFileRoute("/area")({
 function AreaPage() {
   const user = useUser();
   const navigate = useNavigate();
-  const [generated, setGenerated] = useState(false);
+  const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [todayLabel, setTodayLabel] = useState("");
   useEffect(() => {
-    setTodayLabel(new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
+    setTodayLabel(
+      new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }),
+    );
   }, []);
 
   const activeLocation =
@@ -33,37 +50,83 @@ function AreaPage() {
     user.locations[0] ??
     SAMPLE_LOCATIONS[0];
 
-  const briefing = useMemo(() => {
-    const base = getBriefing(activeLocation.id) ?? getBriefing("austin")!;
-    const picks = user.filters.sources;
-    // Filter briefing stories to the user's saved outlets. If none of the
-    // briefing sources are selected, fall back to the full set so the user
-    // still gets a briefing rather than an empty one.
-    const filtered = base.stories.filter((s) => picks.includes(s.source));
-    return { ...base, stories: filtered.length > 0 ? filtered : base.stories };
-  }, [activeLocation.id, user.filters.sources]);
+  const outletSig = useMemo(() => outletSignature(user.filters.sources), [user.filters.sources]);
+  const date = todayKey();
 
-  // Persist generated state per day per location AND outlet selection so a
-  // changed outlet list forces a fresh briefing instead of showing a stale one.
-  const outletSig = useMemo(
-    () => [...user.filters.sources].sort().join("|"),
-    [user.filters.sources],
-  );
-  const storageKey = `briefing_ready_${briefing.locationId}_${briefing.date}_${outletSig}`;
+  // Load cached live briefing on mount / location change.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setGenerated(localStorage.getItem(storageKey) === "1");
-  }, [storageKey]);
+    setError(null);
+    const cached = loadBriefing(activeLocation.id, date, outletSig);
+    if (cached && cached.stories.length > 0) {
+      setBriefing(cached);
+    } else {
+      setBriefing(null);
+    }
+  }, [activeLocation.id, date, outletSig]);
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setGenerating(true);
-    // Simulate the pipeline: aggregate -> summarize -> TTS
-    setTimeout(() => {
-      localStorage.setItem(storageKey, "1");
-      setGenerated(true);
+    setError(null);
+    try {
+      const raw = await fetchLocalStories(activeLocation.city, activeLocation.state);
+      if (raw.length === 0) throw new Error("no-stories");
+
+      // Summarize with Lovable AI so bodies read cleanly through TTS.
+      let summaries: Record<string, { summary: string; body: string; category: string }> = {};
+      try {
+        summaries = await summarizeStories(
+          raw.slice(0, 6).map((s) => ({
+            id: s.id,
+            headline: s.headline,
+            source: s.source,
+            snippet: s.summary,
+          })),
+          activeLocation.city,
+          activeLocation.state,
+        );
+      } catch {
+        // If summarization is unavailable we still show the raw items.
+      }
+
+      const stories = raw.slice(0, 6).map((s) => {
+        const sum = summaries[s.id];
+        return {
+          ...s,
+          summary: sum?.summary ?? s.summary,
+          body: sum?.body ?? s.body,
+          category: sum?.category ?? s.category,
+        };
+      });
+      const built: Briefing = {
+        locationId: activeLocation.id,
+        date,
+        intro: `Here are the top ${stories.length} stories around ${activeLocation.city} today.`,
+        stories,
+      };
+      saveBriefing(activeLocation.id, date, outletSig, built);
+      cacheArticles(stories);
+      setBriefing(built);
+    } catch (err) {
+      // Fallback to the sample briefing when we recognize the location.
+      const mock = getBriefing(activeLocation.id);
+      if (mock) {
+        saveBriefing(activeLocation.id, date, outletSig, mock);
+        cacheArticles(mock.stories);
+        setBriefing(mock);
+        setError("Showing sample stories — live feed unavailable.");
+      } else {
+        setError(
+          err instanceof Error && err.message === "no-stories"
+            ? "No local stories found for this area yet."
+            : "Couldn't reach the live news feed. Try again in a moment.",
+        );
+      }
+    } finally {
       setGenerating(false);
-    }, 1400);
+    }
   }
+
+  const generated = !!briefing;
 
   return (
     <PageShell>
@@ -89,7 +152,9 @@ function AreaPage() {
               {user.locations.map((l) => (
                 <DropdownMenuItem key={l.id} onClick={() => actions.setActive(l.id)}>
                   <span className="font-medium">{l.label}</span>
-                  <span className="ml-2 text-muted-foreground text-xs">{l.city}, {l.state}</span>
+                  <span className="ml-2 text-muted-foreground text-xs">
+                    {l.city}, {l.state}
+                  </span>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
@@ -112,11 +177,15 @@ function AreaPage() {
               color: "white",
             }}
           >
-            <div className="text-[11px] uppercase tracking-wider opacity-80" suppressHydrationWarning>{todayLabel}</div>
+            <div className="text-[11px] uppercase tracking-wider opacity-80" suppressHydrationWarning>
+              {todayLabel}
+            </div>
             <div className="mt-1 flex items-end justify-between">
               <div>
                 <div className="text-2xl font-semibold">5-min briefing</div>
-                <div className="text-sm opacity-85">{briefing.stories.length} stories</div>
+                <div className="text-sm opacity-85">
+                  {generated ? `${briefing!.stories.length} stories` : "Live from local publishers"}
+                </div>
               </div>
               <div className="text-3xl font-display font-semibold">5:00</div>
             </div>
@@ -138,7 +207,7 @@ function AreaPage() {
                 {generating ? (
                   <>
                     <Sparkles className="h-5 w-5 animate-pulse" />
-                    Generating your briefing…
+                    Aggregating & summarizing…
                   </>
                 ) : (
                   <>
@@ -152,35 +221,62 @@ function AreaPage() {
 
           <div className="px-5 py-4 text-sm text-muted-foreground">
             <Clock className="mr-1.5 inline h-3.5 w-3.5" />
-            {generated ? "Ready • updated this morning" : "Tap above to generate today's briefing"}
+            {generated
+              ? "Ready • sourced live from Google News + local outlets"
+              : "Tap above to fetch today's local headlines"}
           </div>
         </div>
 
+        {error ? (
+          <div className="mt-3 flex items-start gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4" />
+            <div>{error}</div>
+          </div>
+        ) : null}
+
         <h2 className="mt-8 text-lg font-semibold">Top stories</h2>
-        <p className="text-sm text-muted-foreground">Curated from local outlets and county feeds.</p>
+        <p className="text-sm text-muted-foreground">
+          {generated
+            ? "Live headlines from local outlets."
+            : "Generate your briefing to see today's headlines."}
+        </p>
 
         <div className="mt-3 space-y-3">
-          {briefing.stories.map((s, i) => (
-            <Link
-              key={s.id}
-              to="/article/$id"
-              params={{ id: s.id }}
-              className="flex gap-3 rounded-2xl bg-surface p-3 border border-border shadow-card transition-transform active:scale-[0.99]"
-            >
-              <StoryArt hue={s.imageHue} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-primary">
-                  <span>{i + 1}</span>·<span>{s.category}</span>
+          {generated
+            ? briefing!.stories.map((s, i) => (
+                <Link
+                  key={s.id}
+                  to="/article/$id"
+                  params={{ id: s.id }}
+                  className="flex gap-3 rounded-2xl bg-surface p-3 border border-border shadow-card transition-transform active:scale-[0.99]"
+                >
+                  <StoryArt hue={s.imageHue} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-primary">
+                      <span>{i + 1}</span>·<span>{s.category}</span>
+                    </div>
+                    <div className="mt-0.5 font-medium leading-snug line-clamp-2">{s.headline}</div>
+                    <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{s.summary}</div>
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{s.source}</span>
+                      <BookmarkBtn id={s.id} />
+                    </div>
+                  </div>
+                </Link>
+              ))
+            : Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex gap-3 rounded-2xl border border-dashed border-border bg-surface/50 p-3"
+                >
+                  <div className="h-16 w-16 shrink-0 rounded-xl bg-muted/40" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3 w-24 rounded bg-muted/40" />
+                    <div className="mt-2 h-4 w-full rounded bg-muted/40" />
+                    <div className="mt-1.5 h-3 w-2/3 rounded bg-muted/30" />
+                  </div>
                 </div>
-                <div className="mt-0.5 font-medium leading-snug line-clamp-2">{s.headline}</div>
-                <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{s.summary}</div>
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>{s.source}</span>
-                  <BookmarkBtn id={s.id} />
-                </div>
-              </div>
-            </Link>
-          ))}
+              ))}
         </div>
       </div>
     </PageShell>

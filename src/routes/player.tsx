@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Pause, Play, Rewind, FastForward, Gauge, FileText } from "lucide-react";
 import { actions, useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS } from "@/lib/mockData";
+import { loadBriefing, outletSignature, todayKey } from "@/lib/news";
 import { speak, createAudioContext, type SpeechHandle } from "@/lib/speech";
 import { StoryArt } from "@/components/StoryArt";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -21,7 +22,12 @@ function Player() {
     user.locations.find((l) => l.id === user.activeLocationId) ??
     user.locations[0] ??
     SAMPLE_LOCATIONS[0];
-  const briefing = useMemo(() => getBriefing(activeLocation.id) ?? getBriefing("austin")!, [activeLocation.id]);
+  const briefing = useMemo(() => {
+    const sig = outletSignature(user.filters.sources);
+    const live = loadBriefing(activeLocation.id, todayKey(), sig);
+    if (live && live.stories.length > 0) return live;
+    return getBriefing(activeLocation.id) ?? getBriefing("austin")!;
+  }, [activeLocation.id, user.filters.sources]);
   const stories = briefing.stories;
 
   const [index, setIndex] = useState(0);

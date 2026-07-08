@@ -14,6 +14,7 @@ import { actions, useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS, type Briefing } from "@/lib/mockData";
 import {
   fetchLocalStories,
+  fetchMunicipalStories,
   summarizeStories,
   saveBriefing,
   loadBriefing,
@@ -68,7 +69,18 @@ function AreaPage() {
     setGenerating(true);
     setError(null);
     try {
-      const raw = await fetchLocalStories(activeLocation.city, activeLocation.state);
+      const [muniRes, localRes] = await Promise.allSettled([
+        fetchMunicipalStories(activeLocation.city, activeLocation.state, activeLocation.county),
+        fetchLocalStories(activeLocation.city, activeLocation.state),
+      ]);
+      const muni = muniRes.status === "fulfilled" ? muniRes.value : [];
+      const local = localRes.status === "fulfilled" ? localRes.value : [];
+
+      // Prefer up to 2 official items at the top, then fill with Google News.
+      const officialTop = muni.slice(0, 2);
+      const officialKeys = new Set(officialTop.map((s) => s.headline.toLowerCase()));
+      const filler = local.filter((s) => !officialKeys.has(s.headline.toLowerCase()));
+      const raw = [...officialTop, ...filler].slice(0, 6);
       if (raw.length === 0) throw new Error("no-stories");
 
       // Summarize with Lovable AI so bodies read cleanly through TTS.
@@ -88,13 +100,17 @@ function AreaPage() {
         // If summarization is unavailable we still show the raw items.
       }
 
-      const stories = raw.slice(0, 6).map((s) => {
+      const officialIds = new Set(officialTop.map((s) => s.id));
+      const stories = raw.map((s) => {
         const sum = summaries[s.id];
+        const isOfficial = officialIds.has(s.id);
         return {
           ...s,
           summary: sum?.summary ?? s.summary,
           body: sum?.body ?? s.body,
-          category: sum?.category ?? s.category,
+          // Keep the municipal category ("City", "County", "Police", …) so
+          // official items are visibly distinct from Google News stories.
+          category: isOfficial ? s.category : sum?.category ?? s.category,
         };
       });
       const built: Briefing = {

@@ -76,6 +76,21 @@ export async function fetchLocalStories(city: string, state: string): Promise<Ra
   return data.stories || [];
 }
 
+export type RawMunicipalStory = LiveStory & { link: string; official: true };
+
+export async function fetchMunicipalStories(
+  city: string,
+  state: string,
+  county?: string,
+): Promise<RawMunicipalStory[]> {
+  const params = new URLSearchParams({ city, state });
+  if (county) params.set("county", county);
+  const res = await fetch(`/api/news/municipal?${params.toString()}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { stories: RawMunicipalStory[] };
+  return data.stories || [];
+}
+
 export async function fetchWorldArticles(topics: string[]): Promise<LiveWorldArticle[]> {
   const q = topics.length ? `?topics=${encodeURIComponent(topics.join(","))}` : "";
   const res = await fetch(`/api/news/world${q}`);

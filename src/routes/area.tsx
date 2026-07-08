@@ -14,6 +14,7 @@ import { actions, useUser } from "@/lib/store";
 import { getBriefing, SAMPLE_LOCATIONS, type Briefing } from "@/lib/mockData";
 import {
   fetchLocalStories,
+  fetchMunicipalStories,
   summarizeStories,
   saveBriefing,
   loadBriefing,
@@ -68,7 +69,18 @@ function AreaPage() {
     setGenerating(true);
     setError(null);
     try {
-      const raw = await fetchLocalStories(activeLocation.city, activeLocation.state);
+      const [muniRes, localRes] = await Promise.allSettled([
+        fetchMunicipalStories(activeLocation.city, activeLocation.state, activeLocation.county),
+        fetchLocalStories(activeLocation.city, activeLocation.state),
+      ]);
+      const muni = muniRes.status === "fulfilled" ? muniRes.value : [];
+      const local = localRes.status === "fulfilled" ? localRes.value : [];
+
+      // Prefer up to 2 official items at the top, then fill with Google News.
+      const officialTop = muni.slice(0, 2);
+      const officialKeys = new Set(officialTop.map((s) => s.headline.toLowerCase()));
+      const filler = local.filter((s) => !officialKeys.has(s.headline.toLowerCase()));
+      const raw = [...officialTop, ...filler].slice(0, 6);
       if (raw.length === 0) throw new Error("no-stories");
 
       // Summarize with Lovable AI so bodies read cleanly through TTS.

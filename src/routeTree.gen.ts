@@ -20,6 +20,7 @@ import { Route as ArticleIdRouteImport } from './routes/article.$id'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiNewsWorldRouteImport } from './routes/api/news.world'
 import { Route as ApiNewsSummarizeRouteImport } from './routes/api/news.summarize'
+import { Route as ApiNewsMunicipalRouteImport } from './routes/api/news.municipal'
 import { Route as ApiNewsLocalRouteImport } from './routes/api/news.local'
 
 const WorldRoute = WorldRouteImport.update({
@@ -77,6 +78,11 @@ const ApiNewsSummarizeRoute = ApiNewsSummarizeRouteImport.update({
   path: '/api/news/summarize',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNewsMunicipalRoute = ApiNewsMunicipalRouteImport.update({
+  id: '/api/news/municipal',
+  path: '/api/news/municipal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNewsLocalRoute = ApiNewsLocalRouteImport.update({
   id: '/api/news/local',
   path: '/api/news/local',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
   '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
   '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/api/tts': typeof ApiTtsRoute
   '/article/$id': typeof ArticleIdRoute
   '/api/news/local': typeof ApiNewsLocalRoute
+  '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/article/$id'
     | '/api/news/local'
+    | '/api/news/municipal'
     | '/api/news/summarize'
     | '/api/news/world'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/article/$id'
     | '/api/news/local'
+    | '/api/news/municipal'
     | '/api/news/summarize'
     | '/api/news/world'
   id:
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/article/$id'
     | '/api/news/local'
+    | '/api/news/municipal'
     | '/api/news/summarize'
     | '/api/news/world'
   fileRoutesById: FileRoutesById
@@ -182,6 +194,7 @@ export interface RootRouteChildren {
   ApiTtsRoute: typeof ApiTtsRoute
   ArticleIdRoute: typeof ArticleIdRoute
   ApiNewsLocalRoute: typeof ApiNewsLocalRoute
+  ApiNewsMunicipalRoute: typeof ApiNewsMunicipalRoute
   ApiNewsSummarizeRoute: typeof ApiNewsSummarizeRoute
   ApiNewsWorldRoute: typeof ApiNewsWorldRoute
 }
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNewsSummarizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/news/municipal': {
+      id: '/api/news/municipal'
+      path: '/api/news/municipal'
+      fullPath: '/api/news/municipal'
+      preLoaderRoute: typeof ApiNewsMunicipalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/news/local': {
       id: '/api/news/local'
       path: '/api/news/local'
@@ -286,19 +306,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTtsRoute: ApiTtsRoute,
   ArticleIdRoute: ArticleIdRoute,
   ApiNewsLocalRoute: ApiNewsLocalRoute,
+  ApiNewsMunicipalRoute: ApiNewsMunicipalRoute,
   ApiNewsSummarizeRoute: ApiNewsSummarizeRoute,
   ApiNewsWorldRoute: ApiNewsWorldRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

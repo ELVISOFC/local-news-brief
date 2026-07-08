@@ -168,6 +168,23 @@ export const actions = {
   setVoiceId(id: string) {
     setState((s) => ({ ...s, voiceId: id }));
   },
+
+  addCustomFeed(locationId: string, feed: CustomFeed) {
+    setState((s) => {
+      const existing = s.customFeeds[locationId] ?? [];
+      if (existing.some((f) => f.url === feed.url)) return s;
+      return { ...s, customFeeds: { ...s.customFeeds, [locationId]: [...existing, feed] } };
+    });
+  },
+  removeCustomFeed(locationId: string, feedId: string) {
+    setState((s) => {
+      const existing = s.customFeeds[locationId] ?? [];
+      return {
+        ...s,
+        customFeeds: { ...s.customFeeds, [locationId]: existing.filter((f) => f.id !== feedId) },
+      };
+    });
+  },
   reset() {
     setState(() => defaultState);
   },

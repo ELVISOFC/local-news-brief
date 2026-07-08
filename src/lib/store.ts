@@ -20,6 +20,13 @@ export type Filters = {
   time: "today" | "week" | "month";
 };
 
+export type CustomFeed = {
+  id: string;
+  source: string; // Display name, e.g. "City of Denver"
+  kind: string; // "City" | "County" | "Police" | "Transit" | "Schools" | "Emergency" | "Other"
+  url: string;
+};
+
 export type UserState = {
   onboarded: boolean;
   locations: Location[];
@@ -29,6 +36,8 @@ export type UserState = {
   voiceRate: number; // 1, 1.25, 1.5, 1.75, 2
   voiceId: string; // Lovable AI voice id (alloy, sage, verse, ...)
   alerts: AlertSettings;
+  // Custom municipal / press-release RSS feeds, keyed by location id.
+  customFeeds: Record<string, CustomFeed[]>;
 };
 
 const KEY = "areanews_state_v1";
@@ -57,6 +66,7 @@ const defaultState: UserState = {
     notifyStories: true,
     categories: [...ALL_CATEGORIES],
   },
+  customFeeds: {},
 };
 
 export { ALL_CATEGORIES };

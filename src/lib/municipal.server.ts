@@ -84,6 +84,59 @@ async function fetchRssRaw(url: string, signal?: AbortSignal): Promise<RawItem[]
   return fetchGoogleNewsRss(url, signal);
 }
 
+// ---------- Server-side cache ----------
+// Per-URL in-memory cache with SWR semantics. Worker instances are ephemeral,
+// but this dramatically reduces upstream fetches for hot feeds within a warm
+// instance and also lets us serve stale content when a feed is down.
+type CacheEntry = { items: RawItem[]; fetchedAt: number; inFlight?: Promise<RawItem[]> };
+const rssCache = new Map<string, CacheEntry>();
+const FRESH_MS = 10 * 60 * 1000; // 10 min — considered fresh, no refetch
+const STALE_MS = 6 * 60 * 60 * 1000; // 6 h — usable on upstream failure
+
+export function cachedRssStats() {
+  const now = Date.now();
+  return Array.from(rssCache.entries()).map(([url, e]) => ({
+    url,
+    items: e.items.length,
+    ageMs: now - e.fetchedAt,
+  }));
+}
+
+async function fetchRssCached(url: string, signal?: AbortSignal): Promise<RawItem[]> {
+  const now = Date.now();
+  const hit = rssCache.get(url);
+  if (hit && now - hit.fetchedAt < FRESH_MS) return hit.items;
+  // Coalesce concurrent refreshes for the same URL.
+  if (hit?.inFlight) {
+    try {
+      return await hit.inFlight;
+    } catch {
+      return hit.items;
+    }
+  }
+  const p = (async () => {
+    try {
+      const items = await fetchRssRaw(url, signal);
+      rssCache.set(url, { items, fetchedAt: Date.now() });
+      return items;
+    } catch (err) {
+      // Stale-on-error: return last-known items if we have any within STALE window.
+      if (hit && now - hit.fetchedAt < STALE_MS) return hit.items;
+      throw err;
+    } finally {
+      const cur = rssCache.get(url);
+      if (cur) rssCache.set(url, { items: cur.items, fetchedAt: cur.fetchedAt });
+    }
+  })();
+  rssCache.set(url, { items: hit?.items ?? [], fetchedAt: hit?.fetchedAt ?? 0, inFlight: p });
+  return p;
+}
+
+export function invalidateRssCache(url?: string) {
+  if (url) rssCache.delete(url);
+  else rssCache.clear();
+}
+
 export type MunicipalStory = {
   id: string;
   headline: string;

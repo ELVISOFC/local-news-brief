@@ -84,6 +84,59 @@ async function fetchRssRaw(url: string, signal?: AbortSignal): Promise<RawItem[]
   return fetchGoogleNewsRss(url, signal);
 }
 
+// ---------- Server-side cache ----------
+// Per-URL in-memory cache with SWR semantics. Worker instances are ephemeral,
+// but this dramatically reduces upstream fetches for hot feeds within a warm
+// instance and also lets us serve stale content when a feed is down.
+type CacheEntry = { items: RawItem[]; fetchedAt: number; inFlight?: Promise<RawItem[]> };
+const rssCache = new Map<string, CacheEntry>();
+const FRESH_MS = 10 * 60 * 1000; // 10 min — considered fresh, no refetch
+const STALE_MS = 6 * 60 * 60 * 1000; // 6 h — usable on upstream failure
+
+export function cachedRssStats() {
+  const now = Date.now();
+  return Array.from(rssCache.entries()).map(([url, e]) => ({
+    url,
+    items: e.items.length,
+    ageMs: now - e.fetchedAt,
+  }));
+}
+
+async function fetchRssCached(url: string, signal?: AbortSignal): Promise<RawItem[]> {
+  const now = Date.now();
+  const hit = rssCache.get(url);
+  if (hit && now - hit.fetchedAt < FRESH_MS) return hit.items;
+  // Coalesce concurrent refreshes for the same URL.
+  if (hit?.inFlight) {
+    try {
+      return await hit.inFlight;
+    } catch {
+      return hit.items;
+    }
+  }
+  const p = (async () => {
+    try {
+      const items = await fetchRssRaw(url, signal);
+      rssCache.set(url, { items, fetchedAt: Date.now() });
+      return items;
+    } catch (err) {
+      // Stale-on-error: return last-known items if we have any within STALE window.
+      if (hit && now - hit.fetchedAt < STALE_MS) return hit.items;
+      throw err;
+    } finally {
+      const cur = rssCache.get(url);
+      if (cur) rssCache.set(url, { items: cur.items, fetchedAt: cur.fetchedAt });
+    }
+  })();
+  rssCache.set(url, { items: hit?.items ?? [], fetchedAt: hit?.fetchedAt ?? 0, inFlight: p });
+  return p;
+}
+
+export function invalidateRssCache(url?: string) {
+  if (url) rssCache.delete(url);
+  else rssCache.clear();
+}
+
 export type MunicipalStory = {
   id: string;
   headline: string;
@@ -97,21 +150,35 @@ export type MunicipalStory = {
   official: true;
 };
 
+export type MunicipalFetchOptions = {
+  custom?: MunicipalFeed[]; // User-supplied feeds
+  refresh?: boolean; // Force cache bypass for these feeds
+};
+
 export async function fetchMunicipalStories(
   city: string,
   state: string,
   county: string | undefined,
   signal?: AbortSignal,
+  opts: MunicipalFetchOptions = {},
 ): Promise<MunicipalStory[]> {
-  const feeds = feedsFor(city, state, county);
-  const useFallback = feeds.length === 0;
-  const targets: MunicipalFeed[] = useFallback
-    ? [{ source: `${city} Official`, kind: "City", url: officialFallbackRss(city, state, county) }]
-    : feeds;
+  const registry = feedsFor(city, state, county);
+  const custom = (opts.custom ?? []).filter((f) => /^https?:\/\//i.test(f.url));
+  // Dedupe by URL — custom overrides registry when the URL matches.
+  const merged = new Map<string, MunicipalFeed>();
+  for (const f of registry) merged.set(f.url, f);
+  for (const f of custom) merged.set(f.url, f);
+  let targets: MunicipalFeed[] = Array.from(merged.values());
+  const useFallback = targets.length === 0;
+  if (useFallback) {
+    targets = [{ source: `${city} Official`, kind: "City", url: officialFallbackRss(city, state, county) }];
+  }
+
+  if (opts.refresh) for (const f of targets) invalidateRssCache(f.url);
 
   const results = await Promise.allSettled(
     targets.map(async (f) => {
-      const items = await fetchRssRaw(f.url, signal);
+      const items = await fetchRssCached(f.url, signal);
       return items.slice(0, 4).map<MunicipalStory>((it, i) => {
         const idSeed = Buffer.from(it.link || (f.url + i)).toString("base64").slice(0, 12);
         return {
@@ -131,7 +198,6 @@ export async function fetchMunicipalStories(
   );
 
   const stories = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  // Dedupe by headline
   const seen = new Set<string>();
   return stories.filter((s) => {
     const k = s.headline.toLowerCase().trim();

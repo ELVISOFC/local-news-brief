@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2 } from "lucide-react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { actions, useUser } from "@/lib/store";
+import { actions, useUser, type CustomFeed } from "@/lib/store";
 import { US_STATES, type Location } from "@/lib/mockData";
 import { VOICE_OPTIONS, createAudioContext } from "@/lib/speech";
 import { AlertSettingsCard } from "@/components/Alerts";
@@ -283,6 +283,10 @@ function Settings() {
           )}
         </Section>
 
+        <CustomFeedsSection />
+
+
+
         <Section title="Voice & playback" icon={<Volume2 className="h-4 w-4" />}>
           <div className="rounded-2xl border border-border bg-surface p-4 space-y-4">
             <div>
@@ -368,3 +372,107 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
     </div>
   );
 }
+
+const FEED_KINDS = ["City", "County", "Police", "Transit", "Schools", "Emergency", "Other"];
+
+function CustomFeedsSection() {
+  const user = useUser();
+  const active = user.locations.find((l) => l.id === user.activeLocationId) ?? user.locations[0];
+  const feeds: CustomFeed[] = active ? user.customFeeds?.[active.id] ?? [] : [];
+  const [source, setSource] = useState("");
+  const [kind, setKind] = useState("City");
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function addFeed() {
+    setError(null);
+    if (!active) return;
+    const trimmedUrl = url.trim();
+    if (!/^https?:\/\/\S+$/i.test(trimmedUrl)) {
+      setError("Enter a valid http(s) RSS URL.");
+      return;
+    }
+    if (!source.trim()) {
+      setError("Give the feed a name (e.g. 'City of Denver').");
+      return;
+    }
+    if (feeds.some((f) => f.url === trimmedUrl)) {
+      setError("This URL is already added.");
+      return;
+    }
+    actions.addCustomFeed(active.id, {
+      id: `feed-${Date.now()}`,
+      source: source.trim(),
+      kind,
+      url: trimmedUrl,
+    });
+    setSource("");
+    setUrl("");
+    setKind("City");
+  }
+
+  return (
+    <Section title="Municipal & press-release feeds" icon={<Rss className="h-4 w-4" />}>
+      {!active ? (
+        <div className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+          Add a location first to attach official RSS feeds.
+        </div>
+      ) : (
+        <>
+          <div className="mb-2 text-xs text-muted-foreground">
+            Feeds for <span className="font-medium text-foreground">{active.city}, {active.state}</span>.
+            Curated city/county feeds are included automatically — add extras below.
+          </div>
+          <div className="space-y-2">
+            {feeds.map((f) => (
+              <div key={f.id} className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">{f.kind}</span>
+                    <span className="truncate font-medium">{f.source}</span>
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.url}</div>
+                </div>
+                <button
+                  onClick={() => actions.removeCustomFeed(active.id, f.id)}
+                  aria-label="Remove feed"
+                  className="text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            {feeds.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                No custom feeds yet.
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-border bg-surface p-4 space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Publisher name</label>
+              <Input value={source} onChange={(e) => setSource(e.target.value)} placeholder="City of Denver" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <label className="text-xs text-muted-foreground">Kind</label>
+                <Select value={kind} onValueChange={setKind}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>{FEED_KINDS.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-muted-foreground">RSS URL</label>
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://denvergov.org/news/rss" />
+              </div>
+            </div>
+            {error ? <div className="text-xs text-destructive">{error}</div> : null}
+            <Button onClick={addFeed} className="w-full gap-1.5"><Plus className="h-4 w-4" /> Add feed</Button>
+          </div>
+        </>
+      )}
+    </Section>
+  );
+}
+

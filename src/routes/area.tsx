@@ -69,8 +69,14 @@ function AreaPage() {
     setGenerating(true);
     setError(null);
     try {
+      const customFeeds = user.customFeeds?.[activeLocation.id] ?? [];
       const [muniRes, localRes] = await Promise.allSettled([
-        fetchMunicipalStories(activeLocation.city, activeLocation.state, activeLocation.county),
+        fetchMunicipalStories(
+          activeLocation.city,
+          activeLocation.state,
+          activeLocation.county,
+          customFeeds.map((f) => ({ source: f.source, kind: f.kind, url: f.url })),
+        ),
         fetchLocalStories(activeLocation.city, activeLocation.state),
       ]);
       const muni = muniRes.status === "fulfilled" ? muniRes.value : [];

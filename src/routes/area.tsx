@@ -100,13 +100,17 @@ function AreaPage() {
         // If summarization is unavailable we still show the raw items.
       }
 
-      const stories = raw.slice(0, 6).map((s) => {
+      const officialIds = new Set(officialTop.map((s) => s.id));
+      const stories = raw.map((s) => {
         const sum = summaries[s.id];
+        const isOfficial = officialIds.has(s.id);
         return {
           ...s,
           summary: sum?.summary ?? s.summary,
           body: sum?.body ?? s.body,
-          category: sum?.category ?? s.category,
+          // Keep the municipal category ("City", "County", "Police", …) so
+          // official items are visibly distinct from Google News stories.
+          category: isOfficial ? s.category : sum?.category ?? s.category,
         };
       });
       const built: Briefing = {

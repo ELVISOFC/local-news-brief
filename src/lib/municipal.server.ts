@@ -150,21 +150,35 @@ export type MunicipalStory = {
   official: true;
 };
 
+export type MunicipalFetchOptions = {
+  custom?: MunicipalFeed[]; // User-supplied feeds
+  refresh?: boolean; // Force cache bypass for these feeds
+};
+
 export async function fetchMunicipalStories(
   city: string,
   state: string,
   county: string | undefined,
   signal?: AbortSignal,
+  opts: MunicipalFetchOptions = {},
 ): Promise<MunicipalStory[]> {
-  const feeds = feedsFor(city, state, county);
-  const useFallback = feeds.length === 0;
-  const targets: MunicipalFeed[] = useFallback
-    ? [{ source: `${city} Official`, kind: "City", url: officialFallbackRss(city, state, county) }]
-    : feeds;
+  const registry = feedsFor(city, state, county);
+  const custom = (opts.custom ?? []).filter((f) => /^https?:\/\//i.test(f.url));
+  // Dedupe by URL — custom overrides registry when the URL matches.
+  const merged = new Map<string, MunicipalFeed>();
+  for (const f of registry) merged.set(f.url, f);
+  for (const f of custom) merged.set(f.url, f);
+  let targets: MunicipalFeed[] = Array.from(merged.values());
+  const useFallback = targets.length === 0;
+  if (useFallback) {
+    targets = [{ source: `${city} Official`, kind: "City", url: officialFallbackRss(city, state, county) }];
+  }
+
+  if (opts.refresh) for (const f of targets) invalidateRssCache(f.url);
 
   const results = await Promise.allSettled(
     targets.map(async (f) => {
-      const items = await fetchRssRaw(f.url, signal);
+      const items = await fetchRssCached(f.url, signal);
       return items.slice(0, 4).map<MunicipalStory>((it, i) => {
         const idSeed = Buffer.from(it.link || (f.url + i)).toString("base64").slice(0, 12);
         return {
@@ -184,7 +198,6 @@ export async function fetchMunicipalStories(
   );
 
   const stories = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  // Dedupe by headline
   const seen = new Set<string>();
   return stories.filter((s) => {
     const k = s.headline.toLowerCase().trim();

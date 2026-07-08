@@ -77,15 +77,28 @@ export async function fetchLocalStories(city: string, state: string): Promise<Ra
 }
 
 export type RawMunicipalStory = LiveStory & { link: string; official: true };
+export type CustomFeedInput = { source: string; kind: string; url: string };
 
 export async function fetchMunicipalStories(
   city: string,
   state: string,
   county?: string,
+  custom?: CustomFeedInput[],
+  refresh?: boolean,
 ): Promise<RawMunicipalStory[]> {
-  const params = new URLSearchParams({ city, state });
-  if (county) params.set("county", county);
-  const res = await fetch(`/api/news/municipal?${params.toString()}`);
+  const hasCustom = Array.isArray(custom) && custom.length > 0;
+  const res = hasCustom
+    ? await fetch(`/api/news/municipal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, state, county, custom, refresh }),
+      })
+    : await (() => {
+        const params = new URLSearchParams({ city, state });
+        if (county) params.set("county", county);
+        if (refresh) params.set("refresh", "1");
+        return fetch(`/api/news/municipal?${params.toString()}`);
+      })();
   if (!res.ok) return [];
   const data = (await res.json()) as { stories: RawMunicipalStory[] };
   return data.stories || [];

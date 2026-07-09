@@ -506,7 +506,10 @@ function CustomFeedsSection() {
               </div>
             </div>
             {error ? <div className="text-xs text-destructive">{error}</div> : null}
-            <Button onClick={addFeed} className="w-full gap-1.5"><Plus className="h-4 w-4" /> Add feed</Button>
+            {notice ? <div className="text-xs text-primary">{notice}</div> : null}
+            <Button onClick={addFeed} disabled={validating} className="w-full gap-1.5">
+              {validating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validating…</> : <><Plus className="h-4 w-4" /> Add feed</>}
+            </Button>
           </div>
         </>
       )}

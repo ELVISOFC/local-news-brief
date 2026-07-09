@@ -43,9 +43,20 @@ function Article() {
     return null;
   }, [id]);
 
+  const clean = useMemo(() => {
+    if (!item) return null;
+    const headline = cleanHeadline((item as { headline: string }).headline);
+    const summary = cleanText((item as { summary?: string }).summary);
+    let body = cleanText((item as { body?: string }).body);
+    // If body degrades to something shorter/identical to summary, prefer summary only.
+    if (body && summary && (body === summary || body.length < 40)) body = "";
+    const link = (item as { link?: string }).link;
+    return { headline, summary, body, link, host: safeHostname(link) };
+  }, [item]);
+
   useEffect(() => () => handleRef.current?.stop(), []);
 
-  if (!item) {
+  if (!item || !clean) {
     return (
       <div className="mx-auto max-w-md p-6 text-center">
         <h1 className="text-xl font-semibold">Article not found</h1>
@@ -55,13 +66,14 @@ function Article() {
   }
 
   function togglePlay() {
-    if (!item) return;
+    if (!item || !clean) return;
     if (playing) {
       handleRef.current?.stop();
       handleRef.current = null;
       setPlaying(false);
     } else {
-      handleRef.current = speak(item.body, {
+      const narration = [clean.summary, clean.body].filter(Boolean).join(" ");
+      handleRef.current = speak(narration || clean.headline, {
         voice: user.voiceId,
         speed: user.voiceRate,
         onEnd: () => setPlaying(false),

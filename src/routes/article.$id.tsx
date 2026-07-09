@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Bookmark, Pause, Play, Share2 } from "lucide-react";
+import { ArrowLeft, Bookmark, ExternalLink, Pause, Play, Share2 } from "lucide-react";
 import { WORLD_ARTICLES } from "@/lib/mockData";
 import { getBriefing } from "@/lib/mockData";
 import { getCachedArticle } from "@/lib/news";
 import { actions, useUser } from "@/lib/store";
 import { StoryArt } from "@/components/StoryArt";
 import { speak, isSpeechSupported, type SpeechHandle } from "@/lib/speech";
+import { cleanHeadline, cleanText, safeHostname } from "@/lib/text-clean";
 
 export const Route = createFileRoute("/article/$id")({
   head: () => ({ meta: [{ title: "Article — AreaNews" }] }),

@@ -383,9 +383,12 @@ function CustomFeedsSection() {
   const [kind, setKind] = useState("City");
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
 
-  function addFeed() {
+  async function addFeed() {
     setError(null);
+    setNotice(null);
     if (!active) return;
     const trimmedUrl = url.trim();
     if (!/^https?:\/\/\S+$/i.test(trimmedUrl)) {
@@ -396,19 +399,54 @@ function CustomFeedsSection() {
       setError("Give the feed a name (e.g. 'City of Denver').");
       return;
     }
-    if (feeds.some((f) => f.url === trimmedUrl)) {
-      setError("This URL is already added.");
-      return;
+    setValidating(true);
+    try {
+      const res = await fetch("/api/news/validate-feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: trimmedUrl,
+          city: active.city,
+          state: active.state,
+          county: active.county,
+          existing: feeds.map((f) => f.url),
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        canonicalUrl?: string;
+        title?: string;
+        itemCount?: number;
+        error?: string;
+      };
+      if (!data.ok) {
+        setError(data.error || "Couldn't validate that feed.");
+        return;
+      }
+      const canonical = data.canonicalUrl || trimmedUrl;
+      if (feeds.some((f) => f.url === canonical)) {
+        setError("This feed is already added.");
+        return;
+      }
+      actions.addCustomFeed(active.id, {
+        id: `feed-${Date.now()}`,
+        source: source.trim(),
+        kind,
+        url: canonical,
+      });
+      setNotice(
+        data.itemCount
+          ? `Added — feed returned ${data.itemCount} recent item${data.itemCount === 1 ? "" : "s"}.`
+          : "Added.",
+      );
+      setSource("");
+      setUrl("");
+      setKind("City");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Validation failed.");
+    } finally {
+      setValidating(false);
     }
-    actions.addCustomFeed(active.id, {
-      id: `feed-${Date.now()}`,
-      source: source.trim(),
-      kind,
-      url: trimmedUrl,
-    });
-    setSource("");
-    setUrl("");
-    setKind("City");
   }
 
   return (
@@ -468,7 +506,10 @@ function CustomFeedsSection() {
               </div>
             </div>
             {error ? <div className="text-xs text-destructive">{error}</div> : null}
-            <Button onClick={addFeed} className="w-full gap-1.5"><Plus className="h-4 w-4" /> Add feed</Button>
+            {notice ? <div className="text-xs text-primary">{notice}</div> : null}
+            <Button onClick={addFeed} disabled={validating} className="w-full gap-1.5">
+              {validating ? <><Loader2 className="h-4 w-4 animate-spin" /> Validating…</> : <><Plus className="h-4 w-4" /> Add feed</>}
+            </Button>
           </div>
         </>
       )}

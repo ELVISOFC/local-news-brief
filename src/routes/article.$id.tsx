@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Bookmark, Pause, Play, Share2 } from "lucide-react";
+import { ArrowLeft, Bookmark, ExternalLink, Pause, Play, Share2 } from "lucide-react";
 import { WORLD_ARTICLES } from "@/lib/mockData";
 import { getBriefing } from "@/lib/mockData";
 import { getCachedArticle } from "@/lib/news";
 import { actions, useUser } from "@/lib/store";
 import { StoryArt } from "@/components/StoryArt";
 import { speak, isSpeechSupported, type SpeechHandle } from "@/lib/speech";
+import { cleanHeadline, cleanText, safeHostname } from "@/lib/text-clean";
 
 export const Route = createFileRoute("/article/$id")({
   head: () => ({ meta: [{ title: "Article — AreaNews" }] }),
@@ -42,9 +43,20 @@ function Article() {
     return null;
   }, [id]);
 
+  const clean = useMemo(() => {
+    if (!item) return null;
+    const headline = cleanHeadline((item as { headline: string }).headline);
+    const summary = cleanText((item as { summary?: string }).summary);
+    let body = cleanText((item as { body?: string }).body);
+    // If body degrades to something shorter/identical to summary, prefer summary only.
+    if (body && summary && (body === summary || body.length < 40)) body = "";
+    const link = (item as { link?: string }).link;
+    return { headline, summary, body, link, host: safeHostname(link) };
+  }, [item]);
+
   useEffect(() => () => handleRef.current?.stop(), []);
 
-  if (!item) {
+  if (!item || !clean) {
     return (
       <div className="mx-auto max-w-md p-6 text-center">
         <h1 className="text-xl font-semibold">Article not found</h1>
@@ -54,13 +66,14 @@ function Article() {
   }
 
   function togglePlay() {
-    if (!item) return;
+    if (!item || !clean) return;
     if (playing) {
       handleRef.current?.stop();
       handleRef.current = null;
       setPlaying(false);
     } else {
-      handleRef.current = speak(item.body, {
+      const narration = [clean.summary, clean.body].filter(Boolean).join(" ");
+      handleRef.current = speak(narration || clean.headline, {
         voice: user.voiceId,
         speed: user.voiceRate,
         onEnd: () => setPlaying(false),
@@ -73,11 +86,11 @@ function Article() {
   const bookmarked = user.bookmarks.includes(item.id);
 
   async function share() {
-    if (!item) return;
+    if (!item || !clean) return;
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
       if (navigator.share) {
-        await navigator.share({ title: item.headline, text: item.summary, url });
+        await navigator.share({ title: clean.headline, text: clean.summary, url });
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(url);
       }
@@ -104,14 +117,30 @@ function Article() {
         <StoryArt hue={item.imageHue} size="lg" />
 
         <div className="mt-4 text-[11px] uppercase tracking-wider text-primary">{item.category}</div>
-        <h1 className="mt-1 text-2xl font-semibold leading-tight text-balance">{item.headline}</h1>
+        <h1 className="mt-1 text-2xl font-semibold leading-tight text-balance">{clean.headline}</h1>
         <div className="mt-2 text-sm text-muted-foreground">{item.source} · {item.publishedAt}</div>
 
-        <p className="mt-5 text-lg leading-relaxed text-balance">{item.summary}</p>
-        <p className="mt-4 text-base leading-relaxed">{item.body}</p>
+        {clean.summary ? (
+          <p className="mt-5 text-lg leading-relaxed text-balance">{clean.summary}</p>
+        ) : null}
+        {clean.body ? (
+          <p className="mt-4 text-base leading-relaxed">{clean.body}</p>
+        ) : null}
+
+        {clean.link ? (
+          <a
+            href={clean.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Read on {clean.host || item.source}
+          </a>
+        ) : null}
 
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
-          This is an AI-generated summary compiled from multiple sources. Tap the source link to read the original reporting.
+          This is an AI-generated summary compiled from multiple sources.{clean.link ? " Tap the source link above to read the original reporting." : ""}
         </div>
       </div>
 

@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ArticleIdRouteImport } from './routes/article.$id'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiNewsWorldRouteImport } from './routes/api/news.world'
+import { Route as ApiNewsValidateFeedRouteImport } from './routes/api/news.validate-feed'
 import { Route as ApiNewsSummarizeRouteImport } from './routes/api/news.summarize'
 import { Route as ApiNewsMunicipalRouteImport } from './routes/api/news.municipal'
 import { Route as ApiNewsLocalRouteImport } from './routes/api/news.local'
@@ -73,6 +74,11 @@ const ApiNewsWorldRoute = ApiNewsWorldRouteImport.update({
   path: '/api/news/world',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNewsValidateFeedRoute = ApiNewsValidateFeedRouteImport.update({
+  id: '/api/news/validate-feed',
+  path: '/api/news/validate-feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNewsSummarizeRoute = ApiNewsSummarizeRouteImport.update({
   id: '/api/news/summarize',
   path: '/api/news/summarize',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/api/news/local': typeof ApiNewsLocalRoute
   '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/validate-feed': typeof ApiNewsValidateFeedRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/api/news/local': typeof ApiNewsLocalRoute
   '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/validate-feed': typeof ApiNewsValidateFeedRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/api/news/local': typeof ApiNewsLocalRoute
   '/api/news/municipal': typeof ApiNewsMunicipalRoute
   '/api/news/summarize': typeof ApiNewsSummarizeRoute
+  '/api/news/validate-feed': typeof ApiNewsValidateFeedRoute
   '/api/news/world': typeof ApiNewsWorldRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/api/news/local'
     | '/api/news/municipal'
     | '/api/news/summarize'
+    | '/api/news/validate-feed'
     | '/api/news/world'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/api/news/local'
     | '/api/news/municipal'
     | '/api/news/summarize'
+    | '/api/news/validate-feed'
     | '/api/news/world'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/api/news/local'
     | '/api/news/municipal'
     | '/api/news/summarize'
+    | '/api/news/validate-feed'
     | '/api/news/world'
   fileRoutesById: FileRoutesById
 }
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   ApiNewsLocalRoute: typeof ApiNewsLocalRoute
   ApiNewsMunicipalRoute: typeof ApiNewsMunicipalRoute
   ApiNewsSummarizeRoute: typeof ApiNewsSummarizeRoute
+  ApiNewsValidateFeedRoute: typeof ApiNewsValidateFeedRoute
   ApiNewsWorldRoute: typeof ApiNewsWorldRoute
 }
 
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNewsWorldRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/news/validate-feed': {
+      id: '/api/news/validate-feed'
+      path: '/api/news/validate-feed'
+      fullPath: '/api/news/validate-feed'
+      preLoaderRoute: typeof ApiNewsValidateFeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/news/summarize': {
       id: '/api/news/summarize'
       path: '/api/news/summarize'
@@ -308,6 +328,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNewsLocalRoute: ApiNewsLocalRoute,
   ApiNewsMunicipalRoute: ApiNewsMunicipalRoute,
   ApiNewsSummarizeRoute: ApiNewsSummarizeRoute,
+  ApiNewsValidateFeedRoute: ApiNewsValidateFeedRoute,
   ApiNewsWorldRoute: ApiNewsWorldRoute,
 }
 export const routeTree = rootRouteImport

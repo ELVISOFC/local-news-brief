@@ -107,6 +107,14 @@ function RootShell({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
+        {/* Some browser extensions inject UI hosts into the body before hydration,
+            which causes React hydration mismatches. Clean them up before the app boots. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "if (typeof document !== 'undefined') { document.querySelectorAll('#qr_cp_host').forEach((el) => el.remove()); }",
+          }}
+        />
         <Scripts />
       </body>
     </html>

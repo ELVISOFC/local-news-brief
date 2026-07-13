@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss } from "lucide-react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss, CheckCircle2, AlertCircle, XCircle, HelpCircle } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -375,6 +375,44 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
 
 const FEED_KINDS = ["City", "County", "Police", "Transit", "Schools", "Emergency", "Other"];
 
+function FeedStatusIndicator({ feed }: { feed: CustomFeed }) {
+  const status = feed.status ?? "unknown";
+  const count = feed.itemCount;
+  const label =
+    status === "valid"
+      ? `Validated & deduped${count !== undefined ? ` · ${count} item${count === 1 ? "" : "s"} found` : ""}`
+      : status === "duplicate"
+      ? "Duplicate feed — not added again"
+      : status === "invalid"
+      ? "Validation failed"
+      : "Status unknown (added before tracking)";
+
+  const icons = {
+    valid: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />,
+    duplicate: <AlertCircle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />,
+    invalid: <XCircle className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />,
+    unknown: <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />,
+  };
+
+  const badgeClass = {
+    valid: "bg-emerald-500/10 text-emerald-600",
+    duplicate: "bg-amber-500/10 text-amber-600",
+    invalid: "bg-destructive/10 text-destructive",
+    unknown: "bg-muted text-muted-foreground",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${badgeClass[status]}`}
+      title={label}
+      aria-label={label}
+    >
+      {icons[status]}
+      {status === "valid" ? "Validated" : status === "duplicate" ? "Duplicate" : status === "invalid" ? "Invalid" : "Unknown"}
+    </span>
+  );
+}
+
 function CustomFeedsSection() {
   const user = useUser();
   const active = user.locations.find((l) => l.id === user.activeLocationId) ?? user.locations[0];
@@ -433,6 +471,9 @@ function CustomFeedsSection() {
         source: source.trim(),
         kind,
         url: canonical,
+        status: "valid",
+        itemCount: data.itemCount,
+        lastChecked: new Date().toISOString(),
       });
       setNotice(
         data.itemCount
@@ -468,6 +509,7 @@ function CustomFeedsSection() {
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">{f.kind}</span>
                     <span className="truncate font-medium">{f.source}</span>
+                    <FeedStatusIndicator feed={f} />
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.url}</div>
                 </div>

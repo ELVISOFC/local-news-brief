@@ -433,6 +433,9 @@ function CustomFeedsSection() {
         source: source.trim(),
         kind,
         url: canonical,
+        status: "valid",
+        itemCount: data.itemCount,
+        lastChecked: new Date().toISOString(),
       });
       setNotice(
         data.itemCount

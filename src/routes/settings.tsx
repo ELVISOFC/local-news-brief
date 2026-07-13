@@ -471,6 +471,7 @@ function CustomFeedsSection() {
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">{f.kind}</span>
                     <span className="truncate font-medium">{f.source}</span>
+                    <FeedStatusIndicator feed={f} />
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.url}</div>
                 </div>

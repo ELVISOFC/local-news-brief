@@ -127,17 +127,29 @@ function Article() {
           <p className="mt-4 text-base leading-relaxed">{clean.body}</p>
         ) : null}
 
-        {clean.link ? (
-          <a
-            href={clean.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Read on {clean.host || item.source}
-          </a>
-        ) : null}
+        <div className="mt-6">
+          {clean.link ? (
+            <a
+              href={clean.link}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4 shrink-0" />
+              <span className="truncate max-w-[16rem]">
+                {clean.host ? `Read on ${clean.host}` : "Read original source"}
+              </span>
+            </a>
+          ) : (
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm text-muted-foreground opacity-70"
+              title="No external source link available for this summary"
+            >
+              <ExternalLink className="h-4 w-4 shrink-0" />
+              Source link unavailable
+            </span>
+          )}
+        </div>
 
         <div className="mt-6 rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
           This is an AI-generated summary compiled from multiple sources.{clean.link ? " Tap the source link above to read the original reporting." : ""}

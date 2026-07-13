@@ -25,6 +25,9 @@ export type CustomFeed = {
   source: string; // Display name, e.g. "City of Denver"
   kind: string; // "City" | "County" | "Police" | "Transit" | "Schools" | "Emergency" | "Other"
   url: string;
+  status: "valid" | "duplicate" | "invalid" | "unknown";
+  itemCount?: number;
+  lastChecked?: string; // ISO timestamp
 };
 
 export type UserState = {

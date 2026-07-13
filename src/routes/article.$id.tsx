@@ -134,11 +134,14 @@ function Article() {
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
+              aria-label={`${clean.host ? `Read on ${clean.host}` : "Read original source"} (opens in a new tab)`}
             >
               <ExternalLink className="h-4 w-4 shrink-0" />
               <span className="truncate max-w-[16rem]">
                 {clean.host ? `Read on ${clean.host}` : "Read original source"}
               </span>
+              <span className="hidden sm:inline text-muted-foreground">·</span>
+              <span className="text-muted-foreground">Opens in new tab ↗</span>
             </a>
           ) : (
             <span

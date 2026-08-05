@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss, CheckCircle2, AlertCircle, XCircle, HelpCircle } from "lucide-react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss, CheckCircle2, AlertCircle, XCircle, HelpCircle, Pencil, Check, X } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

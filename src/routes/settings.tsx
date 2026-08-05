@@ -685,7 +685,21 @@ function CustomFeedsSection() {
                     </div>
                   ) : null}
 
-                  {rowError[f.id] ? <div className="mt-2 text-xs text-destructive">{rowError[f.id]}</div> : null}
+                  {(() => {
+                    const msg = rowError[f.id] || (f.status === "invalid" || f.status === "duplicate" ? f.statusReason : "");
+                    if (!msg || checking) return null;
+                    const tone = f.status === "duplicate" && !rowError[f.id] ? "text-amber-600" : "text-destructive";
+                    return (
+                      <div className={`mt-2 flex items-start gap-1.5 text-xs ${tone}`} role="status">
+                        {f.status === "duplicate" ? (
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        )}
+                        <span>{msg}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

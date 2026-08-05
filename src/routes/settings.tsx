@@ -402,7 +402,8 @@ async function validateFeedUrl(payload: {
 function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: boolean }) {
   const status = feed.status ?? "unknown";
   const count = feed.itemCount;
-  const label =
+  const reason = feed.statusReason?.trim();
+  const base =
     status === "valid"
       ? `Validated & deduped${count !== undefined ? ` · ${count} item${count === 1 ? "" : "s"} found` : ""}`
       : status === "duplicate"
@@ -410,6 +411,7 @@ function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: 
       : status === "invalid"
       ? "Validation failed"
       : "Status unknown (added before tracking)";
+  const label = status !== "valid" && reason ? `${base}: ${reason}` : base;
 
   if (checking) {
     return (

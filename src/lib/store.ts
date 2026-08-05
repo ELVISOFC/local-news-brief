@@ -179,6 +179,18 @@ export const actions = {
       return { ...s, customFeeds: { ...s.customFeeds, [locationId]: [...existing, feed] } };
     });
   },
+  updateCustomFeed(locationId: string, feedId: string, patch: Partial<CustomFeed>) {
+    setState((s) => {
+      const existing = s.customFeeds[locationId] ?? [];
+      return {
+        ...s,
+        customFeeds: {
+          ...s.customFeeds,
+          [locationId]: existing.map((f) => (f.id === feedId ? { ...f, ...patch } : f)),
+        },
+      };
+    });
+  },
   removeCustomFeed(locationId: string, feedId: string) {
     setState((s) => {
       const existing = s.customFeeds[locationId] ?? [];

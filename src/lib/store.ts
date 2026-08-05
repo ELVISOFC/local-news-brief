@@ -26,6 +26,7 @@ export type CustomFeed = {
   kind: string; // "City" | "County" | "Police" | "Transit" | "Schools" | "Emergency" | "Other"
   url: string;
   status: "valid" | "duplicate" | "invalid" | "unknown";
+  statusReason?: string; // Why it failed: unreachable, not RSS/Atom, duplicate, etc.
   itemCount?: number;
   lastChecked?: string; // ISO timestamp
 };

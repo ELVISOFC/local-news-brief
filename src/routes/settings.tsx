@@ -402,7 +402,8 @@ async function validateFeedUrl(payload: {
 function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: boolean }) {
   const status = feed.status ?? "unknown";
   const count = feed.itemCount;
-  const label =
+  const reason = feed.statusReason?.trim();
+  const base =
     status === "valid"
       ? `Validated & deduped${count !== undefined ? ` · ${count} item${count === 1 ? "" : "s"} found` : ""}`
       : status === "duplicate"
@@ -410,6 +411,7 @@ function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: 
       : status === "invalid"
       ? "Validation failed"
       : "Status unknown (added before tracking)";
+  const label = status !== "valid" && reason ? `${base}: ${reason}` : base;
 
   if (checking) {
     return (
@@ -529,8 +531,13 @@ function CustomFeedsSection() {
     const targetUrl = (next?.url ?? feed.url).trim();
     setRowError((m) => ({ ...m, [feed.id]: "" }));
     if (!/^https?:\/\/\S+$/i.test(targetUrl)) {
-      setRowError((m) => ({ ...m, [feed.id]: "Enter a valid http(s) RSS URL." }));
-      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
+      const reason = "Enter a valid http(s) RSS URL.";
+      setRowError((m) => ({ ...m, [feed.id]: reason }));
+      actions.updateCustomFeed(active.id, feed.id, {
+        status: "invalid",
+        statusReason: reason,
+        lastChecked: new Date().toISOString(),
+      });
       return;
     }
     setChecking(feed.id, true);
@@ -549,25 +556,40 @@ function CustomFeedsSection() {
         actions.updateCustomFeed(active.id, feed.id, {
           url: canonical,
           status: "valid",
+          statusReason: undefined,
           itemCount: data.itemCount,
           lastChecked: new Date().toISOString(),
         });
         setEditingId((cur) => (cur === feed.id ? null : cur));
       } else {
+        const reason =
+          data.error ||
+          (data.duplicate === "curated"
+            ? "Already included automatically for your location."
+            : data.duplicate
+            ? "Duplicate of another feed you added."
+            : "Validation failed — feed unreachable or not RSS/Atom.");
         actions.updateCustomFeed(active.id, feed.id, {
           url: data.duplicate ? feed.url : canonical,
           status: data.duplicate ? "duplicate" : "invalid",
+          statusReason: reason,
           itemCount: undefined,
           lastChecked: new Date().toISOString(),
         });
-        setRowError((m) => ({ ...m, [feed.id]: data.error || "Validation failed." }));
+        setRowError((m) => ({ ...m, [feed.id]: reason }));
       }
     } catch (err) {
-      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
-      setRowError((m) => ({ ...m, [feed.id]: err instanceof Error ? err.message : "Validation failed." }));
+      const reason = err instanceof Error ? err.message : "Validation failed — feed unreachable.";
+      actions.updateCustomFeed(active.id, feed.id, {
+        status: "invalid",
+        statusReason: reason,
+        lastChecked: new Date().toISOString(),
+      });
+      setRowError((m) => ({ ...m, [feed.id]: reason }));
     } finally {
       setChecking(feed.id, false);
     }
+
   }
 
   return (
@@ -663,7 +685,21 @@ function CustomFeedsSection() {
                     </div>
                   ) : null}
 
-                  {rowError[f.id] ? <div className="mt-2 text-xs text-destructive">{rowError[f.id]}</div> : null}
+                  {(() => {
+                    const msg = rowError[f.id] || (f.status === "invalid" || f.status === "duplicate" ? f.statusReason : "");
+                    if (!msg || checking) return null;
+                    const tone = f.status === "duplicate" && !rowError[f.id] ? "text-amber-600" : "text-destructive";
+                    return (
+                      <div className={`mt-2 flex items-start gap-1.5 text-xs ${tone}`} role="status">
+                        {f.status === "duplicate" ? (
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        )}
+                        <span>{msg}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

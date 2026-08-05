@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss, CheckCircle2, AlertCircle, XCircle, HelpCircle } from "lucide-react";
+import { MapPin, Plus, Trash2, Volume2, RefreshCw, Play, Square, Loader2, Rss, CheckCircle2, AlertCircle, XCircle, HelpCircle, Pencil, Check, X } from "lucide-react";
 import { PageShell } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -375,7 +375,31 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
 
 const FEED_KINDS = ["City", "County", "Police", "Transit", "Schools", "Emergency", "Other"];
 
-function FeedStatusIndicator({ feed }: { feed: CustomFeed }) {
+type ValidateResult = {
+  ok: boolean;
+  canonicalUrl?: string;
+  title?: string;
+  itemCount?: number;
+  duplicate?: "curated" | "custom";
+  error?: string;
+};
+
+async function validateFeedUrl(payload: {
+  url: string;
+  city?: string;
+  state?: string;
+  county?: string;
+  existing: string[];
+}): Promise<ValidateResult> {
+  const res = await fetch("/api/news/validate-feed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return (await res.json()) as ValidateResult;
+}
+
+function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: boolean }) {
   const status = feed.status ?? "unknown";
   const count = feed.itemCount;
   const label =
@@ -386,6 +410,15 @@ function FeedStatusIndicator({ feed }: { feed: CustomFeed }) {
       : status === "invalid"
       ? "Validation failed"
       : "Status unknown (added before tracking)";
+
+  if (checking) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        Checking…
+      </span>
+    );
+  }
 
   const icons = {
     valid: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />,
@@ -424,6 +457,16 @@ function CustomFeedsSection() {
   const [notice, setNotice] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
 
+  // Per-feed edit + revalidation state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ source: string; kind: string; url: string }>({ source: "", kind: "City", url: "" });
+  const [checkingIds, setCheckingIds] = useState<string[]>([]);
+  const [rowError, setRowError] = useState<Record<string, string>>({});
+
+  function setChecking(id: string, on: boolean) {
+    setCheckingIds((ids) => (on ? [...new Set([...ids, id])] : ids.filter((x) => x !== id)));
+  }
+
   async function addFeed() {
     setError(null);
     setNotice(null);
@@ -439,24 +482,13 @@ function CustomFeedsSection() {
     }
     setValidating(true);
     try {
-      const res = await fetch("/api/news/validate-feed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: trimmedUrl,
-          city: active.city,
-          state: active.state,
-          county: active.county,
-          existing: feeds.map((f) => f.url),
-        }),
+      const data = await validateFeedUrl({
+        url: trimmedUrl,
+        city: active.city,
+        state: active.state,
+        county: active.county,
+        existing: feeds.map((f) => f.url),
       });
-      const data = (await res.json()) as {
-        ok: boolean;
-        canonicalUrl?: string;
-        title?: string;
-        itemCount?: number;
-        error?: string;
-      };
       if (!data.ok) {
         setError(data.error || "Couldn't validate that feed.");
         return;
@@ -490,6 +522,54 @@ function CustomFeedsSection() {
     }
   }
 
+  // Revalidates a feed URL and writes the resulting status straight back into
+  // the store, so the badge updates the moment the check resolves.
+  async function revalidate(feed: CustomFeed, next?: { source: string; kind: string; url: string }) {
+    if (!active) return;
+    const targetUrl = (next?.url ?? feed.url).trim();
+    setRowError((m) => ({ ...m, [feed.id]: "" }));
+    if (!/^https?:\/\/\S+$/i.test(targetUrl)) {
+      setRowError((m) => ({ ...m, [feed.id]: "Enter a valid http(s) RSS URL." }));
+      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
+      return;
+    }
+    setChecking(feed.id, true);
+    // Apply the edited name/kind immediately; URL waits for validation.
+    if (next) actions.updateCustomFeed(active.id, feed.id, { source: next.source.trim() || feed.source, kind: next.kind });
+    try {
+      const data = await validateFeedUrl({
+        url: targetUrl,
+        city: active.city,
+        state: active.state,
+        county: active.county,
+        existing: feeds.filter((f) => f.id !== feed.id).map((f) => f.url),
+      });
+      const canonical = data.canonicalUrl || targetUrl;
+      if (data.ok) {
+        actions.updateCustomFeed(active.id, feed.id, {
+          url: canonical,
+          status: "valid",
+          itemCount: data.itemCount,
+          lastChecked: new Date().toISOString(),
+        });
+        setEditingId((cur) => (cur === feed.id ? null : cur));
+      } else {
+        actions.updateCustomFeed(active.id, feed.id, {
+          url: data.duplicate ? feed.url : canonical,
+          status: data.duplicate ? "duplicate" : "invalid",
+          itemCount: undefined,
+          lastChecked: new Date().toISOString(),
+        });
+        setRowError((m) => ({ ...m, [feed.id]: data.error || "Validation failed." }));
+      }
+    } catch (err) {
+      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
+      setRowError((m) => ({ ...m, [feed.id]: err instanceof Error ? err.message : "Validation failed." }));
+    } finally {
+      setChecking(feed.id, false);
+    }
+  }
+
   return (
     <Section title="Municipal & press-release feeds" icon={<Rss className="h-4 w-4" />}>
       {!active ? (
@@ -503,25 +583,90 @@ function CustomFeedsSection() {
             Curated city/county feeds are included automatically — add extras below.
           </div>
           <div className="space-y-2">
-            {feeds.map((f) => (
-              <div key={f.id} className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">{f.kind}</span>
-                    <span className="truncate font-medium">{f.source}</span>
-                    <FeedStatusIndicator feed={f} />
+            {feeds.map((f) => {
+              const checking = checkingIds.includes(f.id);
+              const isEditing = editingId === f.id;
+              return (
+                <div key={f.id} className="rounded-2xl border border-border bg-surface p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-primary">{f.kind}</span>
+                        <span className="truncate font-medium">{f.source}</span>
+                        <FeedStatusIndicator feed={f} checking={checking} />
+                      </div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.url}</div>
+                      {f.lastChecked ? (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">
+                          Last checked {new Date(f.lastChecked).toLocaleString()}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => revalidate(f)}
+                        disabled={checking}
+                        aria-label="Recheck feed"
+                        title="Recheck feed"
+                        className="text-muted-foreground hover:text-primary disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRowError((m) => ({ ...m, [f.id]: "" }));
+                          if (isEditing) {
+                            setEditingId(null);
+                          } else {
+                            setEditingId(f.id);
+                            setDraft({ source: f.source, kind: f.kind, url: f.url });
+                          }
+                        }}
+                        aria-label={isEditing ? "Cancel editing" : "Edit feed"}
+                        title={isEditing ? "Cancel editing" : "Edit feed"}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        {isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => actions.removeCustomFeed(active.id, f.id)}
+                        aria-label="Remove feed"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{f.url}</div>
+
+                  {isEditing ? (
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Publisher name</label>
+                        <Input value={draft.source} onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value }))} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-1">
+                          <label className="text-xs text-muted-foreground">Kind</label>
+                          <Select value={draft.kind} onValueChange={(v) => setDraft((d) => ({ ...d, kind: v }))}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>{FEED_KINDS.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-muted-foreground">RSS URL</label>
+                          <Input value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} />
+                        </div>
+                      </div>
+                      <Button size="sm" className="w-full gap-1.5" disabled={checking} onClick={() => revalidate(f, draft)}>
+                        {checking ? <><Loader2 className="h-4 w-4 animate-spin" /> Revalidating…</> : <><Check className="h-4 w-4" /> Save & revalidate</>}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {rowError[f.id] ? <div className="mt-2 text-xs text-destructive">{rowError[f.id]}</div> : null}
                 </div>
-                <button
-                  onClick={() => actions.removeCustomFeed(active.id, f.id)}
-                  aria-label="Remove feed"
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
             {feeds.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 No custom feeds yet.

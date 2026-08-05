@@ -375,7 +375,31 @@ function Section({ title, icon, children }: { title: string; icon?: React.ReactN
 
 const FEED_KINDS = ["City", "County", "Police", "Transit", "Schools", "Emergency", "Other"];
 
-function FeedStatusIndicator({ feed }: { feed: CustomFeed }) {
+type ValidateResult = {
+  ok: boolean;
+  canonicalUrl?: string;
+  title?: string;
+  itemCount?: number;
+  duplicate?: "curated" | "custom";
+  error?: string;
+};
+
+async function validateFeedUrl(payload: {
+  url: string;
+  city?: string;
+  state?: string;
+  county?: string;
+  existing: string[];
+}): Promise<ValidateResult> {
+  const res = await fetch("/api/news/validate-feed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return (await res.json()) as ValidateResult;
+}
+
+function FeedStatusIndicator({ feed, checking }: { feed: CustomFeed; checking?: boolean }) {
   const status = feed.status ?? "unknown";
   const count = feed.itemCount;
   const label =
@@ -386,6 +410,15 @@ function FeedStatusIndicator({ feed }: { feed: CustomFeed }) {
       : status === "invalid"
       ? "Validation failed"
       : "Status unknown (added before tracking)";
+
+  if (checking) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        Checking…
+      </span>
+    );
+  }
 
   const icons = {
     valid: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />,

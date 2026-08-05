@@ -531,8 +531,13 @@ function CustomFeedsSection() {
     const targetUrl = (next?.url ?? feed.url).trim();
     setRowError((m) => ({ ...m, [feed.id]: "" }));
     if (!/^https?:\/\/\S+$/i.test(targetUrl)) {
-      setRowError((m) => ({ ...m, [feed.id]: "Enter a valid http(s) RSS URL." }));
-      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
+      const reason = "Enter a valid http(s) RSS URL.";
+      setRowError((m) => ({ ...m, [feed.id]: reason }));
+      actions.updateCustomFeed(active.id, feed.id, {
+        status: "invalid",
+        statusReason: reason,
+        lastChecked: new Date().toISOString(),
+      });
       return;
     }
     setChecking(feed.id, true);
@@ -551,25 +556,40 @@ function CustomFeedsSection() {
         actions.updateCustomFeed(active.id, feed.id, {
           url: canonical,
           status: "valid",
+          statusReason: undefined,
           itemCount: data.itemCount,
           lastChecked: new Date().toISOString(),
         });
         setEditingId((cur) => (cur === feed.id ? null : cur));
       } else {
+        const reason =
+          data.error ||
+          (data.duplicate === "curated"
+            ? "Already included automatically for your location."
+            : data.duplicate
+            ? "Duplicate of another feed you added."
+            : "Validation failed — feed unreachable or not RSS/Atom.");
         actions.updateCustomFeed(active.id, feed.id, {
           url: data.duplicate ? feed.url : canonical,
           status: data.duplicate ? "duplicate" : "invalid",
+          statusReason: reason,
           itemCount: undefined,
           lastChecked: new Date().toISOString(),
         });
-        setRowError((m) => ({ ...m, [feed.id]: data.error || "Validation failed." }));
+        setRowError((m) => ({ ...m, [feed.id]: reason }));
       }
     } catch (err) {
-      actions.updateCustomFeed(active.id, feed.id, { status: "invalid", lastChecked: new Date().toISOString() });
-      setRowError((m) => ({ ...m, [feed.id]: err instanceof Error ? err.message : "Validation failed." }));
+      const reason = err instanceof Error ? err.message : "Validation failed — feed unreachable.";
+      actions.updateCustomFeed(active.id, feed.id, {
+        status: "invalid",
+        statusReason: reason,
+        lastChecked: new Date().toISOString(),
+      });
+      setRowError((m) => ({ ...m, [feed.id]: reason }));
     } finally {
       setChecking(feed.id, false);
     }
+
   }
 
   return (
